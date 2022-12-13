@@ -1,2 +1,8 @@
-*.class
-*.log
+.bloop
+.metals
+.vscode
+target/
+bazel-bin
+bazel-example
+bazel-out
+bazel-testlogs
