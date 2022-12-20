@@ -13,7 +13,6 @@
         "/vol/src/bazel-bsp/.bsp/sbt-launch.jar",
         "xsbt.boot.Boot",
         "-bsp",
-        "-v",
         "--sbt-launch-jar=/vol/src/bazel-bsp/.bsp/sbt-launch.jar"
     ]
 }

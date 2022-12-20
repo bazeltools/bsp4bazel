@@ -15,6 +15,7 @@ import afenton.bazel.bsp.jrpc.PartialJson.JObject
 import afenton.bazel.bsp.Logger
 import scala.reflect.TypeTest
 import io.circe.generic.semiauto.*
+import afenton.bazel.bsp.protocol.BspClient
 
 sealed trait Message:
   def jsonrpc: "2.0"
@@ -22,13 +23,17 @@ sealed trait Message:
 object Message:
 
   given Encoder[Message] = Encoder.instance {
-    case req: Request   => req.asJson
-    case resp: Response => resp.asJson
+    case req: Request      => req.asJson
+    case resp: Response    => resp.asJson
+    case not: Notification => not.asJson
   }
+
+  given Decoder[Message] =
+    Decoder[Request].or(Decoder[Notification].widen)
 
 case class Request(
     jsonrpc: "2.0",
-    id: Option[Int | String],
+    id: Int | String,
     method: String,
     params: Option[Json]
 ) extends Message
@@ -46,7 +51,7 @@ object Request:
         jsonrpc <- h
           .downField("jsonrpc")
           .as["2.0"]
-        id <- h.downField("id").as[Option[Int | String]]
+        id <- h.downField("id").as[Int | String]
         method <- h.downField("method").as[String]
         params <- h.downField("params").as[Option[Json]]
       yield Request(jsonrpc, id, method, params)
@@ -80,12 +85,35 @@ object Response:
       )
     }
 
+case class Notification(jsonrpc: "2.0", method: String, params: Option[Json])
+    extends Message
+object Notification:
+  given Encoder[Notification] =
+    Encoder.instance { obj =>
+      Json.obj(
+        "jsonrpc" -> obj.jsonrpc.asJson,
+        "method" -> obj.method.asJson,
+        "params" -> obj.params.asJson
+      )
+    }
+
+  given Decoder[Notification] =
+    Decoder.instance { h =>
+      for
+        jsonrpc <- h
+          .downField("jsonrpc")
+          .as["2.0"]
+        method <- h.downField("method").as[String]
+        params <- h.downField("params").as[Option[Json]]
+      yield Notification(jsonrpc, method, params)
+    }
+
 case class ResponseError(code: Int, message: String, data: Option[Json])
 object ResponseError:
   given Encoder[ResponseError] = deriveEncoder[ResponseError]
 
 given decodeIntOrString: Decoder[Int | String] =
-  Decoder.instance(h => h.as[Int].orElse(h.as[String]))
+  Decoder.instance(h => h.as[String].orElse(h.as[Int]))
 
 given encodeIntOrString: Encoder[Int | String] =
   Encoder.instance {
@@ -93,12 +121,12 @@ given encodeIntOrString: Encoder[Int | String] =
     case i: Int    => i.asJson
   }
 
-def jRpcParser(logger: Logger): Pipe[IO, String, Request] =
+def jRpcParser(logger: Logger): Pipe[IO, String, Message] =
   def go(
       remaining: String,
       stream: Stream[IO, String],
       logger: Logger
-  ): Pull[IO, Request, Unit] =
+  ): Pull[IO, Message, Unit] =
     stream.pull.uncons1.flatMap {
       case None =>
         Pull.done
@@ -114,24 +142,38 @@ def jRpcParser(logger: Logger): Pipe[IO, String, Request] =
 
   (in: Stream[IO, String]) => go("", in, logger).stream
 
-private def unitJson(json: Json): Boolean = json.asObject match
-  case Some(obj) if obj.isEmpty => true
-  case _                        => false
+object UnitJson:
+  def unapply(json: Json): Boolean = json.asObject match
+    case Some(obj) if obj.isEmpty => true
+    case _                        => false
 
 def messageDispatcher(
     fn: PartialFunction[String, RpcFunction[_, _]]
-): Pipe[IO, Request, Response] =
-  (in: Stream[IO, Request]) =>
-    in.flatMap { request =>
-      Stream
-        .eval[IO, Json] {
-          fn(request.method).apply(request.params.getOrElse(().asJson))
-        }
-        // remove empty responses
-        .filterNot(unitJson)
-        .map { json =>
-          Response("2.0", request.id, Some(json), None)
-        }
+): Pipe[IO, Message, Response | Unit] =
+  (in: Stream[IO, Message]) =>
+    in.flatMap {
+      case notification: Notification =>
+        Stream
+          .eval[IO, Unit] {
+            fn(notification.method)
+              .apply(
+                notification.params.getOrElse(().asJson)
+              )
+              .map(_.as[Unit])
+          }
+      case request: Request =>
+        Stream
+          .eval[IO, Json] {
+            fn(request.method).apply(request.params.getOrElse(().asJson))
+          }
+          .map {
+            case _ @UnitJson() =>
+              Response("2.0", Some(request.id), None, None)
+            case json =>
+              Response("2.0", Some(request.id), Some(json), None)
+          }
+      case _ =>
+        throw Exception("Shouldn't ever get here")
     }
 
 case class RpcFunction[A: Decoder, B: Encoder](fn: A => IO[B]):
@@ -160,22 +202,19 @@ object JRpcConsoleCodec {
     (headers *> P.string("\r\n") *> body)
   }
 
-  def partialParse(str: String): Either[String, (String, Request)] =
+  def partialParse(str: String): Either[String, (String, Message)] =
     parser
       .parse(str)
       .flatMap { (a, b) =>
-        io.circe.parser.decode[Request](b.asString).map(b => (a, b))
+        io.circe.parser.decode[Message](b.asString).map(b => (a, b))
       }
       .leftMap(_.toString)
 
   def encode(msg: Message, includeContentType: Boolean): String =
     def cond(p: Boolean, e: String) =
-      if (p)
-        List(e)
-      else
-        Nil
+      if p then List(e) else Nil
 
-    val jsonStr = msg.asJson.noSpaces
+    val jsonStr = msg.asJson.deepDropNullValues.noSpaces
     val lines =
       List(
         s"Content-Length: ${jsonStr.length}"
@@ -193,3 +232,10 @@ object JRpcConsoleCodec {
     lines.mkString("\r\n") // + "\r\n"
 
 }
+
+trait JRpcClient:
+  def sendNotification[A: Encoder](method: String, params: A): IO[Unit] =
+    val json = Encoder[A].apply(params)
+    sendNotification(Notification("2.0", method, Some(json)))
+
+  def sendNotification(n: Notification): IO[Unit]

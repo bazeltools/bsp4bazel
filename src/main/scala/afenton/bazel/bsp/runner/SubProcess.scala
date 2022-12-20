@@ -1,7 +1,9 @@
 package afenton.bazel.bsp.runner
 
-import java.nio.file.{Files, Path}
 import cats.effect.IO
+
+import java.nio.file.Files
+import java.nio.file.Path
 
 sealed trait SetEnv
 object SetEnv {
@@ -75,9 +77,7 @@ object SubProcess:
 
       val pbEnv = pb.environment()
 
-      if (clearEnvFirst) {
-        pbEnv.clear()
-      }
+      if clearEnvFirst then pbEnv.clear()
       pbEnv.put("PWD", workingPath.toString)
       pbEnv.put("CWD", workingPath.toString)
 

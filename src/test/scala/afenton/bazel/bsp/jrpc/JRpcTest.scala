@@ -36,7 +36,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     assertIO(
       result,
       List(
-        Request("2.0", Some(1), "test", None)
+        Request("2.0", 1, "test", None)
       )
     )
   }
@@ -70,7 +70,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     assertIO(
       result,
       List(
-        Request("2.0", Some(1), "test", None)
+        Request("2.0", 1, "test", None)
       )
     )
   }
@@ -89,7 +89,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     assertIO(
       result,
       List(
-        Request("2.0", Some(1), "test", None)
+        Request("2.0", 1, "test", None)
       )
     )
   }

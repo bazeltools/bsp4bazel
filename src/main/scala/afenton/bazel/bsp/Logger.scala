@@ -28,10 +28,8 @@ class QueueLogger(stdErrQ: Queue[IO, String], verbose: Boolean) extends Logger:
     }
 
   def trace(msgs: String*): IO[Unit] =
-    if (verbose)
-      stdErrQ.offer(format(Logger.Level.Trace, msgs))
-    else
-      IO.unit
+    if verbose then stdErrQ.offer(format(Logger.Level.Trace, msgs))
+    else IO.unit
 
   def info(msgs: String*): IO[Unit] =
     stdErrQ.offer(format(Logger.Level.Info, msgs))

@@ -1,3 +1,4 @@
 package example.foo
 
-final case class Bar(s: StringZ)
+// ERROR
+case class Bar(s: StringQ)

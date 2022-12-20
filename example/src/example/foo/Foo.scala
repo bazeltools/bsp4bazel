@@ -1,3 +1,8 @@
 package example.foo
 
-final case class Foo(i: IntZ)
+trait Before
+
+// ERROR
+case class Foo(i: IntZ) extends BeforeT
+
+case class After(a: String)

@@ -6,9 +6,13 @@ import afenton.bazel.bsp.jrpc.Response
 import afenton.bazel.bsp.jrpc.RpcFunction
 import afenton.bazel.bsp.jrpc.jRpcParser
 import afenton.bazel.bsp.jrpc.messageDispatcher
+import afenton.bazel.bsp.protocol.BspClient
+import afenton.bazel.bsp.protocol.BspServer
+import afenton.bazel.bsp.protocol.TextDocumentIdentifier
 import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.effect.IO
+import cats.effect.kernel.Ref
 import cats.effect.std.Console
 import cats.effect.std.Queue
 import com.monovore.decline._
@@ -19,8 +23,12 @@ import fs2.io.file.Files
 import fs2.io.file.Flags
 import fs2.io.file.Path
 import fs2.text
+import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
 import io.circe.Json
 import io.circe.syntax.*
+
+import java.net.ServerSocket
+import java.nio.file.Paths
 
 object ServerApp
     extends CommandIOApp(
@@ -36,7 +44,12 @@ object ServerApp
 
   def main: Opts[IO[ExitCode]] =
     verboseOpt.map { v =>
-      server(v)
+      server(v).handleError { case e =>
+        System.err.println(
+          s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
+        )
+        ExitCode.Error
+      }
     }
 
   def stdInStream(
@@ -51,8 +64,11 @@ object ServerApp
       .evalTap(request => logger.trace(s"request: ${request}"))
       .through(messageDispatcher(BspServer.jsonRpcRouter(bspServer)))
       .evalTap(response => logger.trace(s"response: ${response}"))
-      .evalMap(resp => stdOutQ.offer(resp))
-      .evalMap(s => IO {})
+      .evalMap {
+        case resp: Response =>
+          stdOutQ.offer(resp)
+        case u: Unit => IO.unit
+      }
 
   def stdErrStream(stdErrQ: Queue[IO, String]): Stream[IO, Unit] =
     Stream
@@ -75,7 +91,12 @@ object ServerApp
       stdOutQ <- Queue.bounded[IO, Message](100)
       logger = new QueueLogger(stdErrQ, verbose)
       client = new MyBspClient(stdOutQ, logger)
-      server = new BazelBspServer(client, logger)
+      stateRef <- Ref.of[IO, ServerState](ServerState.default)
+      server = new BazelBspServer(
+        client,
+        logger,
+        stateRef
+      )
       all = Stream(
         stdInStream(server, stdOutQ, logger),
         stdErrStream(stdErrQ),

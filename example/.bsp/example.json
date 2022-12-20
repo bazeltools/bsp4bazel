@@ -1,11 +1,12 @@
 {
-    "name": "Example",
+    "name": "BazelBsp",
     "version": "0.0.1",
     "bspVersion": "2.0.0",
     "languages": [
         "scala"
     ],
     "argv": [
-        "../target/universal/stage/bin/bazel-bsp"
+        "../target/universal/stage/bin/bazel-bsp",
+        "--verbose"
     ]
 }
