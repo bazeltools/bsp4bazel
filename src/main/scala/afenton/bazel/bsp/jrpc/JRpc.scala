@@ -229,7 +229,7 @@ object JRpcConsoleCodec {
     windowsLines(lines*)
 
   def windowsLines(lines: String*): String =
-    lines.mkString("\r\n") // + "\r\n"
+    lines.mkString("\r\n")
 
 }
 

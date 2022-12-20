@@ -27,7 +27,8 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
       windowsLines(
         "Content-Length: 12",
         "",
-        "{ \"a\": 1 }",
+        """{ "jsonrpc": "2.0", "id": "1", "method": "test" }""",
+        "",
         ""
       )
     )
@@ -36,7 +37,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     assertIO(
       result,
       List(
-        Request("2.0", 1, "test", None)
+        Request("2.0", "1", "test", None)
       )
     )
   }
@@ -60,8 +61,9 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
             "Content-Length: 12",
             ""
           ),
+          "\r\n",
           windowsLines(
-            "{ \"a\": 1 }"
+            """{ "jsonrpc": "2.0", "id": "1", "method": "test" }"""
           )
         )
       )
@@ -70,7 +72,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     assertIO(
       result,
       List(
-        Request("2.0", 1, "test", None)
+        Request("2.0", "1", "test", None)
       )
     )
   }
@@ -80,7 +82,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
       windowsLines(
         "Content-Length: 12",
         "",
-        "{ \"a\": 1 }",
+        """{ "jsonrpc": "2.0", "id": "1", "method": "test" }""",
         "Content-Length: 12"
       )
     )
@@ -89,7 +91,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     assertIO(
       result,
       List(
-        Request("2.0", 1, "test", None)
+        Request("2.0", "1", "test", None)
       )
     )
   }
