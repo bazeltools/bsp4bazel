@@ -8,13 +8,16 @@ name: Build Release Candidate
 on:
   push:
     branches: [ "main" ]
+
 jobs:
   build:
-    name: Build Release Candidate for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
+
+    name: Build Release Candidate for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v3
 
@@ -27,7 +30,7 @@ jobs:
           native-image-job-reports: 'true',
           cache: 'sbt'
 
-      - name: Build
+      - name: Run native image
         run: |
           sbt graalvm-native-image:packageBin
           
