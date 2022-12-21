@@ -28,10 +28,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true',
           cache: 'sbt'
-
-    #   - name: Run native image
-    #     run: |
-    #       sbt graalvm-native-image:packageBin
+      - name: Run native image
+        run: |
+          sbt graalvm-native-image:packageBin
           
     #   - name: Upload binary
     #     uses: actions/upload-artifact@v2
