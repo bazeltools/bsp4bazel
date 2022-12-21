@@ -25,12 +25,10 @@ jobs:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
-          # native-image-job-reports: 'true',
-          # cache: 'sbt'
-      # - name: Run native image
-      #   run: |
-      #     sbt graalvm-native-image:packageBin
+          cache: 'sbt'
+      - name: Run native image
+        run: |
+          sbt graalvm-native-image:packageBin
           
     #   - name: Upload binary
     #     uses: actions/upload-artifact@v2
