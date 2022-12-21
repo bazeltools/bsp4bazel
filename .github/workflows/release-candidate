@@ -1,0 +1,38 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Build Release Candidate
+
+on:
+  push:
+    branches: [ "main" ]
+jobs:
+  build:
+    name: Build Release Candidate for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          version: '22.3.0'
+          java-version: '17'
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true',
+          cache: 'sbt'
+
+      - name: Build
+        run: |
+          sbt graalvm-native-image:packageBin
+          
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: bazel-bsp-${{ matrix.os }}
+          path: target/graalvm-native-image/bazel-bsp
