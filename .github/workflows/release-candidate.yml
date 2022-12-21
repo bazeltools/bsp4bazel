@@ -18,24 +18,24 @@ jobs:
     name: Build Release Candidate for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
-    steps:
-      - uses: actions/checkout@v3
+    # steps:
+    #   - uses: actions/checkout@v3
 
-      - uses: graalvm/setup-graalvm@v1
-        with:
-          version: '22.3.0'
-          java-version: '17'
-          components: 'native-image'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          native-image-job-reports: 'true',
-          cache: 'sbt'
+    #   - uses: graalvm/setup-graalvm@v1
+    #     with:
+    #       version: '22.3.0'
+    #       java-version: '17'
+    #       components: 'native-image'
+    #       github-token: ${{ secrets.GITHUB_TOKEN }}
+    #       native-image-job-reports: 'true',
+    #       cache: 'sbt'
 
-      - name: Run native image
-        run: |
-          sbt graalvm-native-image:packageBin
+    #   - name: Run native image
+    #     run: |
+    #       sbt graalvm-native-image:packageBin
           
-      - name: Upload binary
-        uses: actions/upload-artifact@v2
-        with:
-          name: bazel-bsp-${{ matrix.os }}
-          path: target/graalvm-native-image/bazel-bsp
+    #   - name: Upload binary
+    #     uses: actions/upload-artifact@v2
+    #     with:
+    #       name: bazel-bsp-${{ matrix.os }}
+    #       path: target/graalvm-native-image/bazel-bsp
