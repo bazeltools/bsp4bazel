@@ -18,8 +18,8 @@ jobs:
     name: Build Release Candidate for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
-    # steps:
-    #   - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
     #   - uses: graalvm/setup-graalvm@v1
     #     with:
