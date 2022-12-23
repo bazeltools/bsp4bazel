@@ -23,6 +23,9 @@ lazy val root = project
     libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,
     libraryDependencies += "org.typelevel" %% "munit-cats-effect-3" % "1.0.7" % Test,
     maintainer := "Aish Fenton",
+    scalacOptions ++= Seq(
+      "-explain"
+    ),
     graalVMNativeImageOptions ++= Seq(
       "--initialize-at-build-time",
       "--no-fallback" // Bakes-in run-time reflection (alternately: --auto-fallback, --force-fallback)

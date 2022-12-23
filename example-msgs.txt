@@ -1,3 +1,0 @@
-Content-Length: 502
-
-{"jsonrpc":"2.0","id":"1","method":"build/initialize","params":{"rootUri":"file:///vol/src/bazel-bsp/example/","displayName":"Metals","version":"0.11.9","bspVersion":"2.1.0-M1","capabilities":{"languageIds":["scala","java"]},"data":{"javaSemanticdbVersion":"0.7.4","semanticdbVersion":"4.6.0","supportedScalaVersions":["2.13.9","2.12.17","2.12.16","2.12.15","2.12.14","2.12.13","2.12.12","2.13.5","2.13.6","2.13.7","2.13.8","2.11.12","2.12.9","2.12.10","2.12.11","2.13.1","2.13.2","2.13.3","2.13.4"]}}}
