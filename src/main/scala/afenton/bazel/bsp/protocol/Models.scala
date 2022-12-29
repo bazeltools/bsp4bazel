@@ -38,6 +38,12 @@ object BuildTargetIdentifier:
   given Codec[BuildTargetIdentifier] =
     deriveCodec[BuildTargetIdentifier]
 
+  def bazel(uri: String): BuildTargetIdentifier =
+    BuildTargetIdentifier(UriFactory.bazelUri(uri))
+
+  def file(uri: String): BuildTargetIdentifier =
+    BuildTargetIdentifier(UriFactory.fileUri(uri))
+
 case class ScalaBuilderTarget(
     scalaOrganization: String,
     scalaVersion: String,
@@ -91,13 +97,13 @@ case class InitializeBuildParams(
     displayName: String,
     version: String,
     bspVersion: String,
-    capabilities: BuildServerCapabilities,
+    capabilities: BuildClientCapabilities,
     rootUri: URI,
     data: Option[Json]
 )
 object InitializeBuildParams:
-  given Decoder[InitializeBuildParams] =
-    deriveDecoder[InitializeBuildParams]
+  given Codec[InitializeBuildParams] =
+    deriveCodec[InitializeBuildParams]
 
 case class BuildClientCapabilities(languageIds: List[String])
 
@@ -109,8 +115,8 @@ case class InitializeBuildResult(
     data: Option[Json] = None
 )
 object InitializeBuildResult:
-  given Encoder[InitializeBuildResult] =
-    deriveEncoder[InitializeBuildResult]
+  given Codec[InitializeBuildResult] =
+    deriveCodec[InitializeBuildResult]
 
 case class BuildServerCapabilities(
     compileProvider: Option[CompileProvider] = None,
@@ -218,7 +224,7 @@ case class CompileParams(
     arguments: Option[List[String]]
 )
 object CompileParams:
-  given Decoder[CompileParams] = deriveDecoder[CompileParams]
+  given Codec[CompileParams] = deriveCodec[CompileParams]
 
 case class WorkspaceBuildTargetsResult(targets: List[BuildTarget])
 object WorkspaceBuildTargetsResult:

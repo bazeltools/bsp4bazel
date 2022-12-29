@@ -3,6 +3,6 @@
 .vscode
 target/
 bazel-bin
-bazel-example
-bazel-out
-bazel-testlogs
+bazel-*/
+bazel-out/
+bazel-testlogs/

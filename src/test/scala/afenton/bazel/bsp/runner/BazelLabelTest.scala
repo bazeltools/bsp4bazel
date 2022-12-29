@@ -1,6 +1,9 @@
 package afenton.bazel.bsp.runner
 
-class BazelLabelTest extends munit.CatsEffectSuite {
+import org.scalacheck.Gen
+import org.scalacheck.Prop.forAll
+
+class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
 
   test("should create BazelTargets from strings") {
 
@@ -60,44 +63,25 @@ class BazelLabelTest extends munit.CatsEffectSuite {
   }
 
   test("should create BazelLabels from strings") {
+    def law(bl1: BazelLabel, bl2: BazelLabel): Unit =
+      assertEquals(bl1, bl2)
 
-    assertEquals(
-      BazelLabel.fromString("//...").toTry.get,
-      BazelLabel(None, BPath.Wildcard, None)
-    )
-
-    assertEquals(
-      BazelLabel.fromString("//:all").toTry.get,
-      BazelLabel(None, BPath.BNil, Some(BazelTarget.AllRules))
-    )
-
-    assertEquals(
-      BazelLabel.fromString("//foo/bar:myRule").toTry.get,
-      BazelLabel(
+    val commonExamples = List(
+      BazelLabel.fromString("//...").toTry.get -> BazelLabel(None, BPath.Wildcard, None),
+      BazelLabel.fromString("//:all").toTry.get -> BazelLabel(None, BPath.BNil, Some(BazelTarget.AllRules)),
+      BazelLabel.fromString("//foo/bar:myRule").toTry.get -> BazelLabel(
         None,
         "foo" :: "bar" :: BPath.BNil,
         Some(BazelTarget.Single("myRule"))
-      )
-    )
-
-    assertEquals(
-      BazelLabel.fromString("@myRepo//foo/bar:myRule").toTry.get,
-      BazelLabel(
+      ),
+      BazelLabel.fromString("@myRepo//foo/bar:*").toTry.get -> BazelLabel(
         Some("@myRepo"),
         "foo" :: "bar" :: BPath.BNil,
-        Some(BazelTarget.Single("myRule"))
-      )
-    )
-
-    assertEquals(
-      BazelLabel.fromString("//foo/...:*").toTry.get,
-      BazelLabel(
-        None,
-        "foo" :: BPath.Wildcard,
         Some(BazelTarget.AllTargetsAndRules)
       )
     )
 
+    commonExamples.map(law)
   }
 
   test("should drop wildcard") {
@@ -111,4 +95,44 @@ class BazelLabelTest extends munit.CatsEffectSuite {
     )
   }
 
-}
+  property("should round-trip paths") {
+    forAll(BazelLabelTest.genBazelLabel) { bl1 =>
+      val str = bl1.asString
+      val bl2 = BazelLabel.fromString(str).toTry.get
+      assertEquals(bl1, bl2)
+    }
+  }
+
+end BazelLabelTest
+
+object BazelLabelTest:
+
+  private val genRepo: Gen[String] =
+    Gen.alphaStr.map(s => s"@myRepo$s")
+
+  private def genPath: Gen[BPath] =
+    for
+      head <- Gen.alphaStr.map(s => s"part_$s")
+      path <- Gen.oneOf(
+        Gen.const(BPath.BNil),
+        Gen.const(BPath.Wildcard),
+        Gen.delay { genPath.map(tail => BPath.BCons(head, tail)) }
+      )
+    yield path
+
+  private val genTarget: Gen[BazelTarget] =
+    for
+      name <- Gen.alphaStr.map(s => s"myTarget_$s")
+      tar <- Gen.oneOf(
+        BazelTarget.AllRules,
+        BazelTarget.AllTargetsAndRules,
+        BazelTarget.Single(name)
+      )
+    yield tar
+
+  val genBazelLabel: Gen[BazelLabel] =
+    for
+      repo <- Gen.option(genRepo)
+      path <- genPath
+      target <- Gen.option(genTarget)
+    yield BazelLabel(repo, path, target)

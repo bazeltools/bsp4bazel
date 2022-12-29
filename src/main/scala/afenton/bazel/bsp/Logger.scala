@@ -13,6 +13,12 @@ object Logger:
   enum Level:
     case Trace, Info, Error
 
+  def noOp = new Logger {
+    def trace(msgs: String*): IO[Unit] = IO { () }
+    def info(msgs: String*): IO[Unit] = trace(msgs*)
+    def error(msgs: String*): IO[Unit] = trace(msgs*)
+  }
+
 class QueueLogger(stdErrQ: Queue[IO, String], verbose: Boolean) extends Logger:
   private def format(level: Logger.Level, msgs: Seq[String]) =
     def fmt(level: String, color: String, msgs: Seq[String]) =

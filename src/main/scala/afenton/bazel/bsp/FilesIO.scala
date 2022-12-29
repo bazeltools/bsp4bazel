@@ -46,7 +46,7 @@ object FilesIO:
     * @param maxDepth
     *   How deep into sub-dirs to go, before stopping.
     */
-  def walkTree(
+  def walk(
       root: Path,
       glob: Option[String] = None,
       maxDepth: Int = 100

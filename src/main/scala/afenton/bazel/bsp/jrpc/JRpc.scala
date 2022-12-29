@@ -29,7 +29,7 @@ object Message:
   }
 
   given Decoder[Message] =
-    Decoder[Request].or(Decoder[Notification].widen)
+    Decoder[Request].or(Decoder[Notification].widen).or(Decoder[Response].widen)
 
 case class Request(
     jsonrpc: "2.0",
@@ -85,6 +85,19 @@ object Response:
       )
     }
 
+  given Decoder[Response] =
+    Decoder.instance { h =>
+      for
+        jsonrpc <- h
+          .downField("jsonrpc")
+          .as["2.0"]
+        id <- h.downField("id").as[Option[Int | String]]
+        result <- h.downField("result").as[Option[Json]]
+        error <- h.downField("error").as[Option[ResponseError]]
+      yield Response(jsonrpc, id, result, error)
+    }
+
+
 case class Notification(jsonrpc: "2.0", method: String, params: Option[Json])
     extends Message
 object Notification:
@@ -110,7 +123,7 @@ object Notification:
 
 case class ResponseError(code: Int, message: String, data: Option[Json])
 object ResponseError:
-  given Encoder[ResponseError] = deriveEncoder[ResponseError]
+  given Codec[ResponseError] = deriveCodec[ResponseError]
 
 given decodeIntOrString: Decoder[Int | String] =
   Decoder.instance(h => h.as[String].orElse(h.as[Int]))
@@ -172,8 +185,7 @@ def messageDispatcher(
             case json =>
               Response("2.0", Some(request.id), Some(json), None)
           }
-      case _ =>
-        throw Exception("Shouldn't ever get here")
+      case _ => throw Exception("shouldn't get here")
     }
 
 case class RpcFunction[A: Decoder, B: Encoder](fn: A => IO[B]):

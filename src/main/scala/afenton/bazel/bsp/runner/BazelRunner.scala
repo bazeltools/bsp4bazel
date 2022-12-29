@@ -59,12 +59,14 @@ case class MyBazelRunner(logger: Logger) extends BazelRunner:
   ): IO[ExecutionResult] =
     for
       _ <- logger.info(s"Running ./bazel $command ${label.asString}")
-      er <- SubProcess.runCommand(
-        workspaceRoot,
-        "./bazel",
-        command,
-        label.asString
-      )()
+      er <- SubProcess
+        .withCommand(
+          workspaceRoot,
+          "./bazel",
+          command,
+          label.asString
+        )
+        .runUntilExit
       _ <- logger.info(s"Exited with ${er.exitCode}")
     yield er
 
@@ -101,7 +103,7 @@ case class MyBazelRunner(logger: Logger) extends BazelRunner:
 
   def diagnostics(workspaceRoot: Path): Stream[IO, FileDiagnostics] =
     FilesIO
-      .walkTree(
+      .walk(
         workspaceRoot.resolve("bazel-bin"),
         Some("*.diagnosticsproto"),
         100

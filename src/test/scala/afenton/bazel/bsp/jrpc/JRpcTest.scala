@@ -15,11 +15,7 @@ import afenton.bazel.bsp.Logger
 
 class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
 
-  val noLog = new Logger {
-    def trace(msgs: String*): IO[Unit] = IO { () }
-    def info(msgs: String*): IO[Unit] = trace(msgs*)
-    def error(msgs: String*): IO[Unit] = trace(msgs*)
-  }
+  val noLog = Logger.noOp
 
   test("should process a complete message") {
 

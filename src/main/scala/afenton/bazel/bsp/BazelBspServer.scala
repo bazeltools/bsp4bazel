@@ -80,7 +80,7 @@ class BazelBspServer(
   ): IO[InverseSourcesResult] =
     for
       state <- stateRef.get
-      _ <- logger.trace("buildTarget/inverseSources")
+      _ <- logger.info("buildTarget/inverseSources")
       state <- stateRef.get
     yield
       val relativeUri =

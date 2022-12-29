@@ -1,0 +1,13 @@
+load("@io_bazel_rules_scala//scala:scala.bzl", "scala_library")
+load("@bazel-bsp-rules//:sources.bzl", "source_files")
+
+scala_library(
+    name = "foo",
+    srcs = glob(["*.scala"]),
+    visibility = ["//visibility:public"],
+)
+
+source_files(
+    name = "sources",
+    target = ":foo",
+)
