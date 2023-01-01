@@ -1,4 +1,5 @@
 load("@io_bazel_rules_scala//scala:scala.bzl", "scala_binary")
+load("@bazel-bsp-rules//:bsp_target.bzl", "bsp_target")
 
 scala_binary(
     name = "main_run",
@@ -6,3 +7,9 @@ scala_binary(
     visibility = ["//visibility:public"],
     deps = ["//src/example"],
 )
+
+bsp_target(
+    name = "src_bsp",
+    target = ":main_run",
+)
+

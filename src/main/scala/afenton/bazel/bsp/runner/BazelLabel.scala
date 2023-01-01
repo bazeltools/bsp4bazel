@@ -70,6 +70,16 @@ sealed trait BPath:
 
     r0(this)
 
+  /** Adds a wildcard suffix, if not already present (otherwise noop)
+    */
+  def withWildcard: BPath =
+    def r0(path: BPath): BPath = path match
+      case BCons(name, tail) => BCons(name, r0(tail))
+      case Wildcard          => Wildcard
+      case BNil              => Wildcard
+
+    r0(this)
+
 object BPath:
   case class BCons(name: String, tail: BPath) extends BPath
   case object Wildcard extends BPath
@@ -125,6 +135,9 @@ case class BazelLabel(
 
   def withTarget(bt: BazelTarget): BazelLabel =
     copy(target = Some(bt))
+
+  def allRulesResursive: BazelLabel =
+    copy(packagePath = packagePath.withWildcard, Some(BazelTarget.AllRules))
 
   def withoutWildcard: BazelLabel =
     copy(packagePath = packagePath.withoutWildcard)

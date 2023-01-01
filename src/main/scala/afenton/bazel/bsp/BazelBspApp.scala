@@ -60,7 +60,7 @@ object BazelBspApp
   private def processInStream(
       inStream: Stream[IO, String],
       bspServer: BspServer,
-      stdOutQ: Queue[IO, Message],
+      outQ: Queue[IO, Message],
       logger: Logger
   ): Stream[IO, Unit] =
     inStream
@@ -71,7 +71,7 @@ object BazelBspApp
       .evalTap(response => logger.trace(s"response: ${response}"))
       .evalMap {
         case resp: Response =>
-          stdOutQ.offer(resp)
+          outQ.offer(resp)
         case u: Unit => IO.unit
       }
 

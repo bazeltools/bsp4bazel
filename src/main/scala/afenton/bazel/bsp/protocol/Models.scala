@@ -169,10 +169,8 @@ object DebugProvider:
 
 case class TaskId(id: String, parents: Option[List[String]])
 object TaskId:
-  given Encoder[TaskId] =
-    deriveEncoder[TaskId]
-  given Decoder[TaskId] =
-    deriveDecoder[TaskId]
+  given Codec[TaskId] =
+    deriveCodec[TaskId]
 
 case class TaskStartParams(
     taskId: TaskId,
@@ -182,8 +180,8 @@ case class TaskStartParams(
     data: Option[Json]
 )
 object TaskStartParams:
-  given Encoder[TaskStartParams] =
-    deriveEncoder[TaskStartParams]
+  given Codec[TaskStartParams] =
+    deriveCodec[TaskStartParams]
 
 case class TaskProgressParams(
     taskId: TaskId,
@@ -205,6 +203,12 @@ enum StatusCode(val id: Int):
 object StatusCode:
   given Encoder[StatusCode] =
     Encoder.instance(_.id.asJson)
+  given Decoder[StatusCode] =
+    Decoder[Int].map { 
+      case 1 => StatusCode.Ok
+      case 2 => StatusCode.Error
+      case 3 => StatusCode.Cancelled
+    }
 
 case class TaskFinishParams(
     taskId: TaskId,
@@ -215,8 +219,8 @@ case class TaskFinishParams(
     data: Option[Json]
 )
 object TaskFinishParams:
-  given Encoder[TaskFinishParams] =
-    deriveEncoder[TaskFinishParams]
+  given Codec[TaskFinishParams] =
+    deriveCodec[TaskFinishParams]
 
 case class CompileParams(
     targets: List[BuildTargetIdentifier],
@@ -362,8 +366,8 @@ case class PublishDiagnosticsParams(
     reset: Boolean
 )
 object PublishDiagnosticsParams:
-  given Encoder[PublishDiagnosticsParams] =
-    deriveEncoder[PublishDiagnosticsParams]
+  given Codec[PublishDiagnosticsParams] =
+    deriveCodec[PublishDiagnosticsParams]
 
   def fromScalacDiagnostic(
       baseDir: Path,
@@ -395,9 +399,17 @@ object PublishDiagnosticsParams:
     )
 
 case class TextDocumentIdentifier(uri: URI)
+
 object TextDocumentIdentifier:
-  given Encoder[TextDocumentIdentifier] =
-    deriveEncoder[TextDocumentIdentifier]
+  given Codec[TextDocumentIdentifier] =
+    deriveCodec[TextDocumentIdentifier]
+
+  def file(file: Path): TextDocumentIdentifier = 
+    TextDocumentIdentifier(UriFactory.fileUri(file))
+
+  def file(file: String): TextDocumentIdentifier = 
+    this.file(Paths.get(file))
+
 
 case class Diagnostic(
     range: Range,
@@ -410,26 +422,37 @@ case class Diagnostic(
     relatedInformation: Option[List[DiagnosticRelatedInformation]],
     data: Option[Json]
 )
+
 object Diagnostic:
-  given Encoder[Diagnostic] =
-    deriveEncoder[Diagnostic]
+  given Codec[Diagnostic] =
+    deriveCodec[Diagnostic]
 
 case class DiagnosticRelatedInformation(location: Location, message: String)
+
 object DiagnosticRelatedInformation:
-  given Encoder[DiagnosticRelatedInformation] =
-    deriveEncoder[DiagnosticRelatedInformation]
+  given Codec[DiagnosticRelatedInformation] =
+    deriveCodec[DiagnosticRelatedInformation]
 
 case class Location(uri: URI, range: Range)
+
 object Location:
-  given Encoder[Location] =
-    deriveEncoder[Location]
+  given Codec[Location] =
+    deriveCodec[Location]
 
 enum DiagnosticTag(val i: Int):
   case Unnecessary extends DiagnosticTag(1)
   case Deprecated extends DiagnosticTag(2)
+
 object DiagnosticTag:
+
   given Encoder[DiagnosticTag] =
     Encoder.instance(dt => dt.i.asJson)
+
+  given Decoder[DiagnosticTag] =
+    Decoder[Int].map {
+      case 1 => DiagnosticTag.Unnecessary
+      case 2 => DiagnosticTag.Deprecated
+    }
 
 enum DiagnosticSeverity(val i: Int):
   case Error extends DiagnosticSeverity(1)
@@ -437,8 +460,17 @@ enum DiagnosticSeverity(val i: Int):
   case Information extends DiagnosticSeverity(3)
   case Hint extends DiagnosticSeverity(4)
 object DiagnosticSeverity:
+
   given Encoder[DiagnosticSeverity] =
     Encoder.instance(ds => ds.i.asJson)
+
+  given Decoder[DiagnosticSeverity] =
+    Decoder[Int].map {
+      case 1 => DiagnosticSeverity.Error
+      case 2 => DiagnosticSeverity.Warning
+      case 3 => DiagnosticSeverity.Information
+      case 4 => DiagnosticSeverity.Hint
+    }
 
   def fromScalacSeverity(sv: ScalacSeverity): DiagnosticSeverity =
     sv match {
@@ -451,13 +483,13 @@ object DiagnosticSeverity:
 
 case class CodeDescription(href: String)
 object CodeDescription:
-  given Encoder[CodeDescription] =
-    deriveEncoder[CodeDescription]
+  given Codec[CodeDescription] =
+    deriveCodec[CodeDescription]
 
 case class Range(start: Position, end: Position)
 object Range:
-  given Encoder[Range] =
-    deriveEncoder[Range]
+  given Codec[Range] =
+    deriveCodec[Range]
 
   def fromScalacRange(rng: ScalacRange): Range =
     (rng.start, rng.end) match
@@ -481,8 +513,8 @@ object Range:
 
 case class Position(line: Int, character: Int)
 object Position:
-  given Encoder[Position] =
-    deriveEncoder[Position]
+  given Codec[Position] =
+    deriveCodec[Position]
 
   def fromScalacPosition(pos: ScalacPosition): Position =
     Position(pos.line, pos.character)
@@ -537,6 +569,14 @@ enum TaskDataKind(val id: String):
 
 object TaskDataKind:
   given Encoder[TaskDataKind] = Encoder.instance(_.id.asJson)
+  given Decoder[TaskDataKind] = Decoder[String].map { 
+    case "compile-task" => TaskDataKind.CompileTask
+    case "compile-report" => TaskDataKind.CompileReport
+    case "test-task" => TaskDataKind.TestTask
+    case "test-report" => TaskDataKind.TestReport
+    case "test-start" => TaskDataKind.TestStart
+    case "test-finish" => TaskDataKind.TestFinish
+  }
 
 case class CompileTask(target: BuildTargetIdentifier)
 object CompileTask:

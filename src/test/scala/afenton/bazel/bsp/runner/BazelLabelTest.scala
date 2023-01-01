@@ -62,6 +62,17 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
 
   }
 
+  test("should add wildcard to Bazel path") {
+    assertEquals(
+      BPath.fromString("a/b/c").toTry.get.withWildcard,
+      "a" :: "b" :: "c" :: BPath.Wildcard
+    )
+    assertEquals(
+      BPath.fromString("a/b/c/...").toTry.get.withWildcard,
+      "a" :: "b" :: "c" :: BPath.Wildcard
+    )
+  }
+
   test("should create BazelLabels from strings") {
     def law(bl1: BazelLabel, bl2: BazelLabel): Unit =
       assertEquals(bl1, bl2)
@@ -91,6 +102,26 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
         None,
         "foo" :: "bar" :: BPath.BNil,
         Some(BazelTarget.AllTargetsAndRules)
+      )
+    )
+  }
+
+  test("should change to select all rules recurisvely") {
+    assertEquals(
+      BazelLabel.fromString("//foo/bar").toTry.get.allRulesResursive,
+      BazelLabel(
+        None,
+        "foo" :: "bar" :: BPath.Wildcard,
+        Some(BazelTarget.AllRules)
+      )
+    )
+
+    assertEquals(
+      BazelLabel.fromString("//foo/bar/...:*").toTry.get.allRulesResursive,
+      BazelLabel(
+        None,
+        "foo" :: "bar" :: BPath.Wildcard,
+        Some(BazelTarget.AllRules)
       )
     )
   }

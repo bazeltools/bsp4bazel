@@ -4,7 +4,7 @@ import afenton.bazel.bsp.jrpc.JRpcClient
 import afenton.bazel.bsp.jrpc.Message
 import afenton.bazel.bsp.jrpc.Notification
 import afenton.bazel.bsp.protocol.*
-import afenton.bazel.bsp.runner.MyBazelRunner
+import afenton.bazel.bsp.runner.BazelRunner
 import afenton.bazel.bsp.runner.BazelLabel
 import cats.effect.IO
 import cats.effect.kernel.Ref
@@ -24,10 +24,12 @@ case class ServerState(
     targetSourceMap: TargetSourceMap,
     currentErrors: List[FileDiagnostics],
     workspaceRoot: Option[Path],
+    bazelRunner: Option[BazelRunner],
     targets: List[BuildTarget]
 )
+
 object ServerState:
-  def default: ServerState = ServerState(TargetSourceMap.empty, Nil, None, Nil)
+  def default: ServerState = ServerState(TargetSourceMap.empty, Nil, None, None, Nil)
 
 class BazelBspServer(
     client: BspClient,
@@ -38,15 +40,18 @@ class BazelBspServer(
   private val version = "0.1"
   private val bspVersion = "2.0.0-M2"
 
-  private val bazelRunner = MyBazelRunner(logger)
-
   def buildInitialize(
       params: InitializeBuildParams
   ): IO[InitializeBuildResult] =
     for
       _ <- logger.info("buildInitialize")
       workspaceRoot = Paths.get(params.rootUri)
-      _ <- stateRef.update(_.copy(workspaceRoot = Some(workspaceRoot)))
+      _ <- stateRef.update(state =>
+        state.copy(
+          workspaceRoot = Some(workspaceRoot),
+          bazelRunner = Some(BazelRunner.default(workspaceRoot, logger))
+        )
+      )
       resp <- IO.pure {
         val compileProvider = CompileProvider(List("scala"))
 
@@ -70,6 +75,7 @@ class BazelBspServer(
       ws <- workspaceBuildTargets(())
       ts <- doBuildTargetSources(
         state.workspaceRoot.get,
+        state.bazelRunner.get,
         ws.targets.map(_.id)
       )
       _ <- stateRef.update(s => s.copy(targetSourceMap = TargetSourceMap(ts)))
@@ -95,13 +101,12 @@ class BazelBspServer(
       )
 
   private def buildTarget(
-      id: URI,
-      displayName: String,
+      bspTarget: BspServer.Target,
       workspaceRoot: Path
   ): BuildTarget =
     BuildTarget(
-      BuildTargetIdentifier(id),
-      Some(displayName),
+      BuildTargetIdentifier(bspTarget.id),
+      Some(bspTarget.name),
       Some(UriFactory.fileUri(workspaceRoot)),
       List("library"),
       BuildTargetCapabilities(true, false, false, false),
@@ -120,49 +125,14 @@ class BazelBspServer(
       )
     )
 
-  case class Target(id: URI, name: String)
-  object Target:
-    given Decoder[List[Target]] = Decoder.instance { c =>
-      c.keys match {
-        case Some(ks) =>
-          ks.map { k =>
-            c.downField(k).as[String].map { v =>
-              Target(UriFactory.bazelUri(v), k)
-            }
-          }.toList
-            .sequence
-        case None =>
-          Left(
-            DecodingFailure(
-              s"Expected Json Object instead got ${c.value}",
-              c.history
-            )
-          )
-      }
-    }
-
-  private def readTargetConfig: IO[Either[Throwable, List[BuildTarget]]] =
-    for
-      state <- stateRef.get
-      json <- FilesIO.readJson[Json](
-        state.workspaceRoot.get.resolve(".bazelBspTargets.json")
-      )
-    yield json match
-      case Right(json) =>
-        json
-          .as[List[Target]]
-          .map(_.map(t => buildTarget(t.id, t.name, state.workspaceRoot.get)))
-      case Left(e) => Left(e)
-
   def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult] =
     for
       _ <- logger.info("workspace/buildTargets")
-      config <- readTargetConfig
-      wbt <- config match {
-        case Right(bts) => IO(WorkspaceBuildTargetsResult(bts))
-        case Left(err)  => IO.raiseError(err)
-      }
-    yield wbt
+      state <- stateRef.get
+      bspTargets <- state.bazelRunner.get.bspTargets
+    yield WorkspaceBuildTargetsResult(
+      bspTargets.map(t => buildTarget(t, state.workspaceRoot.get))
+    )
 
   def buildTargetScalacOptions(
       params: ScalacOptionsParams
@@ -182,13 +152,14 @@ class BazelBspServer(
 
   private def doCompile(
       workspaceRoot: Path,
+      bazelRunner: BazelRunner,
       target: BuildTargetIdentifier,
       id: TaskId
   ): IO[List[FileDiagnostics]] =
     BazelLabel.fromBuildTargetIdentifier(target) match {
       case Right(bazelLabel) =>
         bazelRunner
-          .compile(workspaceRoot, bazelLabel)
+          .compile(bazelLabel)
           .filterNot(fd => fd.path.toString.endsWith("<no file>"))
           .evalTap { fd =>
             for
@@ -253,7 +224,7 @@ class BazelBspServer(
           Some(CompileTask(target).asJson)
         )
       )
-      fds <- doCompile(state.workspaceRoot.get, target, id)
+      fds <- doCompile(state.workspaceRoot.get, state.bazelRunner.get, target, id)
       _ <- clearPrevDiagnostics(target, fds)
       end <- IO.realTimeInstant
       _ <- client.buildTaskFinished(
@@ -290,6 +261,7 @@ class BazelBspServer(
 
   private def doBuildTargetSources(
       workspaceRoot: Path,
+      bazelRunner: BazelRunner,
       targets: List[BuildTargetIdentifier]
   ): IO[Map[BuildTargetIdentifier, List[TextDocumentIdentifier]]] =
     targets
@@ -297,10 +269,8 @@ class BazelBspServer(
         BazelLabel.fromBuildTargetIdentifier(bt) match
           case Right(bazelTarget) =>
             bazelRunner
-              .targetSources(workspaceRoot, bazelTarget)
-              .map(ss =>
-                (bt, ss.map(s => TextDocumentIdentifier(UriFactory.fileUri(s))))
-              )
+              .targetSources(bazelTarget)
+              .map(ss => (bt, ss.map(s => TextDocumentIdentifier.file(s))))
           case Left(err) =>
             IO.raiseError(err)
       }

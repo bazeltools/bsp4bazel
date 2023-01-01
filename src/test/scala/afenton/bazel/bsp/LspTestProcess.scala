@@ -1,5 +1,6 @@
 package afenton.bazel.bsp
 
+import afenton.bazel.bsp.Lsp.Action
 import afenton.bazel.bsp.jrpc.JRpcConsoleCodec
 import afenton.bazel.bsp.jrpc.Message
 import afenton.bazel.bsp.jrpc.Notification
@@ -9,9 +10,11 @@ import afenton.bazel.bsp.jrpc.jRpcParser
 import afenton.bazel.bsp.jrpc.messageDispatcher
 import afenton.bazel.bsp.protocol.BuildClientCapabilities
 import afenton.bazel.bsp.protocol.BuildTargetIdentifier
+import afenton.bazel.bsp.protocol.CompileParams
 import afenton.bazel.bsp.protocol.InitializeBuildParams
 import afenton.bazel.bsp.protocol.InitializeBuildResult
 import afenton.bazel.bsp.protocol.UriFactory
+import afenton.bazel.bsp.runner.SubProcess
 import cats.Functor
 import cats.effect.IO
 import cats.effect.kernel.Deferred
@@ -21,19 +24,15 @@ import cats.effect.std.Console
 import cats.effect.std.MapRef
 import cats.effect.std.Queue
 import cats.syntax.all.*
-import fs2.Stream
 import fs2.Pipe
+import fs2.Stream
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 
-import java.nio.file.Paths
-import afenton.bazel.bsp.Lsp.Action
-import afenton.bazel.bsp.protocol.CompileParams
-import afenton.bazel.bsp.runner.SubProcess
-import afenton.bazel.bsp.runner.ProcessIO
 import java.nio.file.Path
+import java.nio.file.Paths
 import scala.concurrent.duration.FiniteDuration
 
 type OpenRequests = Map[String, Deferred[IO, Response]]
@@ -131,7 +130,7 @@ object BspClient:
       def coerce: Option[A] = None
     }
 
-/** Simulates client requests. Useful for testing
+/** Simulates client requests. Intended for test use only
   */
 case class LspTestProcess(workspaceRoot: Path):
 
@@ -208,11 +207,11 @@ case class LspTestProcess(workspaceRoot: Path):
       client = BspClient(openRequests, bspInQ, counter)
       result = IO.both(
         processActions(client, actions),
-        processBspOut(
+        (processBspOut(
           Stream.fromQueueUnterminated(bspOutQ),
           openRequests,
           duration
-        ) <& processBspErr(Stream.fromQueueUnterminated(bspErrQ), duration)
+        ) <& processBspErr(Stream.fromQueueUnterminated(bspErrQ), duration))
       )
       out <- IO.race(bspServer, result)
     yield out.right.get
@@ -225,7 +224,7 @@ case class LspTestProcess(workspaceRoot: Path):
           "0.1",
           "2.1",
           BuildClientCapabilities(List("scala")),
-          UriFactory.fileUri(Paths.get("/vol/src/bazel-bsp/example")),
+          UriFactory.fileUri(workspaceRoot),
           None
         )
       )
@@ -233,6 +232,9 @@ case class LspTestProcess(workspaceRoot: Path):
       d2 <- client.buildInitialized(())
       _ <- d2.get
     yield resp
+ 
+  extension [A](io: IO[A])
+    def marker(str: String) = io.map { a => System.err.println(str + s" WITH: $a");  a }
 
   private def compile(
       client: BspClient,
@@ -245,7 +247,7 @@ case class LspTestProcess(workspaceRoot: Path):
           None,
           None
         )
-      )
+      ).marker("AFTER COMPILE IN LSP")
       resp <- dResp.get
     yield resp
 
@@ -255,13 +257,14 @@ case class Lsp(actions: Vector[Lsp.Action]):
   def start: Lsp = 
     this :+ Lsp.Action.Start
 
-  def compile(target: BuildTargetIdentifier): Lsp =
-    this :+ Lsp.Action.Compile(target) 
+  def compile(target: String): Lsp =
+    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target)) 
 
   def runFor(
+      workspaceRoot: Path,
       duration: FiniteDuration
   ): IO[(List[Matchable], List[Notification])] =
-    LspTestProcess(Paths.get("/tmp")).runFor(actions.toList, duration)
+    LspTestProcess(workspaceRoot).runFor(actions.toList, duration)
 
 object Lsp:
 

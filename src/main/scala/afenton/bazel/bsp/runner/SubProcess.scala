@@ -1,10 +1,12 @@
 package afenton.bazel.bsp.runner
 
 import cats.effect.IO
+import fs2.Stream
 
 import java.nio.file.Files
 import java.nio.file.Path
-import fs2.Stream
+import scala.concurrent.duration.FiniteDuration
+import cats.effect.kernel.Resource
 
 sealed trait SetEnv
 object SetEnv {
@@ -15,6 +17,7 @@ object SetEnv {
 
 trait ExecutionResult {
   def exitCode: Int
+  def workingDirectory: Path
   def stdoutLines: IO[Seq[String]]
   def stderrLines: IO[Seq[String]]
   def command: String
@@ -24,51 +27,43 @@ trait ExecutionResult {
     for {
       stdoutLines <- stdoutLines
       stderrLines <- stderrLines
-    } yield s"""exit code: ${exitCode}
-         |${stdoutLines.mkString("\n")}
+    } yield s"""Exited with: ${exitCode}
+         |workingDir:
+         |${workingDirectory}
+         |
+         |command:
+         |${command} ${commandArgs.mkString(" ")}
          |
          |stderr:
          |${stderrLines.mkString("\n")}
+         |
+         |stdout:
+         |${stdoutLines.mkString("\n")}
          |""".stripMargin
 }
 
 case class SubProcess(
-    workingPath: Path,
+    workingDirectory: Path,
     command: String,
     args: List[String],
     env: Map[String, SetEnv],
-    stdoutPath: Option[Path],
-    stderrPath: Option[Path],
     clearEnvFirst: Boolean
 ):
 
-  private def setupEnvironment: IO[(ProcessBuilder, Path, Path)] =
+  def withArgs(args: List[String]): SubProcess =
+    copy(args = args)
+
+  private def mkEnvironment: IO[ProcessBuilder] =
     IO.blocking {
       val pb = new ProcessBuilder(command)
-      pb.directory(workingPath.toFile)
+      pb.directory(workingDirectory.toFile)
       pb.command((command :: args.toList): _*)
-
-      val stdout = stdoutPath.getOrElse {
-        val stdout: Path = Files.createTempFile("stdout", ".log")
-        stdout.toFile.deleteOnExit()
-        stdout
-      }
-
-      val stderr = stderrPath.getOrElse {
-        val stderr: Path = Files.createTempFile("stderr", ".log")
-        stderr.toFile.deleteOnExit()
-        stderr
-      }
-
-      pb
-        .redirectError(stderr.toFile)
-        .redirectOutput(stdout.toFile)
 
       val pbEnv = pb.environment()
 
       if clearEnvFirst then pbEnv.clear()
-      pbEnv.put("PWD", workingPath.toString)
-      pbEnv.put("CWD", workingPath.toString)
+      pbEnv.put("PWD", workingDirectory.toString)
+      pbEnv.put("CWD", workingDirectory.toString)
 
       env.foreach { case (k, setEnv) =>
         setEnv match {
@@ -86,26 +81,51 @@ case class SubProcess(
         }
       }
 
-      (pb, stdout, stderr)
+      pb
     }
 
-  def start: IO[ProcessIO] =
-    for
-      env <- setupEnvironment
-      (pb, out, err) = env
-      process = pb.start()
-    yield 
-      ProcessIO(process)
+  def redirectToTmp(pb: ProcessBuilder): IO[(Path, Path)] =
+    IO.blocking {
+
+      val stdout = {
+        val stdout: Path = Files.createTempFile("stdout", ".log")
+        stdout.toFile.deleteOnExit()
+        stdout
+      }
+
+      val stderr = {
+        val stderr: Path = Files.createTempFile("stderr", ".log")
+        stderr.toFile.deleteOnExit()
+        stderr
+      }
+
+      pb
+        .redirectError(stderr.toFile)
+        .redirectOutput(stdout.toFile)
+
+      (stdout, stderr)
+
+    }
+
+  def start: Resource[IO, RunningProcess] =
+    Resource.make {
+      for
+        pb <- mkEnvironment
+        process = pb.start()
+      yield RunningProcess(process)
+    }(_.exit)
 
   def runUntilExit: IO[ExecutionResult] =
     for
-      env <- setupEnvironment
-      (pb, stdout, stderr) = env
-      exitCode <- IO.blocking {
+      pb <- mkEnvironment
+      files <- redirectToTmp(pb)
+      (stdout, stderr) = files
+      exitCode <- IO.interruptibleMany {
         val process: Process = pb.start()
         process.waitFor()
       }
     yield SubProcess.FileExecutionResult(
+      workingDirectory = workingDirectory,
       exitCode = exitCode,
       stdoutPath = stdout,
       stderrPath = stderr,
@@ -116,6 +136,7 @@ case class SubProcess(
 object SubProcess:
 
   private case class FileExecutionResult(
+      workingDirectory: Path,
       command: String,
       commandArgs: List[String],
       exitCode: Int,
@@ -131,13 +152,17 @@ object SubProcess:
     )
   }
 
-  def withCommand(workingPath: Path, command: String, args: String*): SubProcess =
-    SubProcess(workingPath, command, args.toList, Map.empty, None, None, false)
+  def from(
+      workingPath: Path,
+      command: String,
+      args: String*
+  ): SubProcess =
+    SubProcess(workingPath, command, args.toList, Map.empty, false)
 
-case class ProcessIO(process: Process):
+case class RunningProcess(process: Process):
 
   def in(stdin: Stream[IO, String]): IO[Unit] =
-    val fos = IO(process.getOutputStream)
+    val fos = IO.blocking(process.getOutputStream)
 
     stdin
       .flatMap(s => Stream.fromIterator[IO](s.getBytes.iterator, 1_000))
@@ -146,13 +171,16 @@ case class ProcessIO(process: Process):
       .drain
 
   def out: Stream[IO, String] =
-    val ios = IO(process.getInputStream)
+    val is = IO.blocking(process.getInputStream)
     fs2.io
-      .readInputStream[IO](ios, 1_000, false)
+      .readInputStream[IO](is, 1_000, false)
       .through(fs2.text.utf8.decode)
 
   def err: Stream[IO, String] =
-    val eos = IO(process.getErrorStream)
+    val es = IO.blocking(process.getErrorStream)
     fs2.io
-      .readInputStream[IO](eos, 1_000, false)
+      .readInputStream[IO](es, 1_000, false)
       .through(fs2.text.utf8.decode)
+
+  def exit: IO[Unit] =
+    IO.interruptibleMany(process.destroy())

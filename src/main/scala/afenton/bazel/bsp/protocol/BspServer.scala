@@ -2,6 +2,7 @@ package afenton.bazel.bsp.protocol
 
 import cats.effect.IO
 import afenton.bazel.bsp.jrpc.RpcFunction
+import java.net.URI
 
 trait BspServer(client: BspClient):
   def buildInitialize(params: InitializeBuildParams): IO[InitializeBuildResult]
@@ -57,5 +58,6 @@ object BspServer:
       RpcFunction(bspServer.buildTargetCleanCache)
     case "$/cancelRequest" =>
       RpcFunction(bspServer.cancelRequest)
-
   }
+
+  case class Target(id: URI, name: String)

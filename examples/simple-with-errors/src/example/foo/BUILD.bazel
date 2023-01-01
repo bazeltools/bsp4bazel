@@ -1,5 +1,5 @@
 load("@io_bazel_rules_scala//scala:scala.bzl", "scala_library")
-load("@bazel-bsp-rules//:sources.bzl", "source_files")
+load("@bazel-bsp-rules//:bsp_target.bzl", "bsp_target")
 
 scala_library(
     name = "foo",
@@ -7,7 +7,7 @@ scala_library(
     visibility = ["//visibility:public"],
 )
 
-source_files(
-    name = "sources",
+bsp_target(
+    name = "foo_bsp",
     target = ":foo",
 )
