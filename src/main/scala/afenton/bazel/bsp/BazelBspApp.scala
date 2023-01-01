@@ -15,6 +15,7 @@ import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.Console
 import cats.effect.std.Queue
+import cats.syntax.all.*
 import com.monovore.decline._
 import com.monovore.decline.effect._
 import fs2.Pipe
@@ -30,11 +31,13 @@ import io.circe.syntax.*
 import java.net.ServerSocket
 import java.nio.file.Paths
 
+val Version = "0.0.2-alpha"
+
 object BazelBspApp
     extends CommandIOApp(
       name = "bazel-bsp",
       header = "Bazel BSP server",
-      version = "0.0.1"
+      version = Version
     ):
 
   val verboseOpt =
@@ -42,20 +45,53 @@ object BazelBspApp
       .flag("verbose", help = "Include trace output on stderr")
       .orFalse
 
+  val setupOpt =
+    Opts
+      .flag("setup", help = "write BSP configuration files into CWD")
+      .orFalse
+
   def main: Opts[IO[ExitCode]] =
-    verboseOpt.map { v =>
-      server(v)(
-        fs2.io.stdinUtf8[IO](10_000),
-        fs2.text.utf8.encode.andThen(fs2.io.stdout),
-        fs2.text.utf8.encode.andThen(fs2.io.stderr)
-      )
-        .handleError { case e =>
-          System.err.println(
-            s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
-          )
-          ExitCode.Error
-        }
+    (verboseOpt, setupOpt).mapN { (v, setup) =>
+      if setup then writeBspConfig(Version).as(ExitCode.Success)
+      else
+        server(v)(
+          fs2.io.stdinUtf8[IO](10_000),
+          fs2.text.utf8.encode.andThen(fs2.io.stdout),
+          fs2.text.utf8.encode.andThen(fs2.io.stderr)
+        )
+          .handleError { case e =>
+            System.err.println(
+              s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
+            )
+            ExitCode.Error
+          }
     }
+
+  private def writeBspConfig(version: String): IO[Unit] =
+    val toPath = fs2.io.file.Path(".bsp/bazel-bsp.json") 
+
+    Stream
+      .emits(bspConfig(version).getBytes())
+      .through(
+        fs2.io.file.Files[IO].writeAll(toPath)
+      )
+      .compile
+      .drain
+      .flatMap(_ => Console[IO].println(s"Write setup config to ${toPath.toNioPath.toAbsolutePath()}"))
+
+  private def bspConfig(version: String): String = """
+{
+    "name": "BazelBsp",
+    "version": "${version}",
+    "bspVersion": "2.1.0-M1",
+    "languages": [
+        "scala"
+    ],
+    "argv": [
+        "bazel-bsp"
+    ]
+}
+"""
 
   private def processInStream(
       inStream: Stream[IO, String],
@@ -104,7 +140,9 @@ object BazelBspApp
       outQ <- Queue.bounded[IO, Message](100)
       logger = Logger.toQueue(errQ, verbose)
       client = BspClient.toQueue(outQ, logger)
-      stateRef <- Ref.of[IO, BazelBspServer.ServerState](BazelBspServer.defaultState)
+      stateRef <- Ref.of[IO, BazelBspServer.ServerState](
+        BazelBspServer.defaultState
+      )
       server = new BazelBspServer(
         client,
         logger,
