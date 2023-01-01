@@ -168,8 +168,7 @@ object BazelLabel:
   def parse(str: String): Either[P.Error, BazelLabel] =
     parser.parseAll(str)
 
-  private[runner] val parser: P0[BazelLabel] = {
-
+  private[runner] val parser: P0[BazelLabel] = 
     val repo: P[String] =
       (P.char('@') ~ P.charsWhile(c => c != '/')).string
 
@@ -178,5 +177,3 @@ object BazelLabel:
       .map { case ((r, p), t) =>
         BazelLabel(r, p, t.flatten)
       }
-
-  }

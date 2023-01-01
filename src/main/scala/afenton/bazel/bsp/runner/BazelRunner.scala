@@ -31,14 +31,6 @@ import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
 
-case class BazelSources(sources: List[String], buildFiles: List[String])
-object BazelSources:
-  given Decoder[BazelSources] = Decoder.instance { c =>
-    for
-      sources <- c.downField("sources").as[List[String]]
-      buildFiles <- c.downField("buildFiles").as[List[String]]
-    yield BazelSources(sources, buildFiles)
-  }
 
 trait BazelRunner:
   def compile(target: BazelLabel): Stream[IO, FileDiagnostics]
@@ -48,11 +40,25 @@ trait BazelRunner:
   def bspTargets: IO[List[BspServer.Target]]
 
 object BazelRunner:
-  val Ok: Int = 0
-  val BuildFailed: Int = 1
 
-  def raiseIfUnxpectedExit(er: ExecutionResult, expected: Int*): IO[Unit] =
-    if !expected.contains(er.exitCode) then
+  enum ExitCode(val code: Int):
+    case Ok extends ExitCode(0)
+    case BuildFailed extends ExitCode(1)
+
+  object ExitCode:
+    def fromCode(code: Int): ExitCode = code match 
+      case 0 => ExitCode.Ok
+      case 1 => ExitCode.BuildFailed
+
+  enum Command(val asString: String):
+    case Query extends Command("query")
+    case Build extends Command("build")
+    case Test extends Command("test")
+    case Shutdown extends Command("shutdown")
+    case Clean extends Command("clean")
+
+  def raiseIfUnxpectedExit(er: ExecutionResult, expected: ExitCode*): IO[Unit] =
+    if !expected.contains(ExitCode.fromCode(er.exitCode)) then
       for
         err <- er.debugString
         _ <- IO.raiseError(BazelRunError(err, er.exitCode))
@@ -70,46 +76,46 @@ object BazelRunner:
 
     def shutdown: IO[Unit] =
       for
-        er <- runBazel("shutdown", None)
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, BazelRunner.Ok)
+        er <- runBazel(Command.Shutdown, None)
+        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
       yield ()
 
     def clean: IO[Unit] =
       for
-        er <- runBazel("clean", None)
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, BazelRunner.Ok)
+        er <- runBazel(Command.Clean, None)
+        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
       yield ()
 
     private def runBazel(
-        command: String,
+        command: Command,
         expr: Option[String]
     ): IO[ExecutionResult] =
       for
         _ <- logger.info(
-          s"Running ./bazel $command ${expr.getOrElse("_no_args_")}"
+          s"Running ./bazel ${command.asString} ${expr.getOrElse("_no_args_")}"
         )
         er <- SubProcess
           .from(
             workspaceRoot,
             "./bazel"
           )
-          .withArgs(command :: expr.toList)
+          .withArgs(command.asString :: expr.toList)
           .runUntilExit
           .timeout(FiniteDuration(30, TimeUnit.SECONDS))
         _ <- logger.info(s"Exited with ${er.exitCode}")
       yield er
 
     private def runBazel(
-        command: String,
+        command: Command,
         label: BazelLabel
     ): IO[ExecutionResult] =
       runBazel(command, Some(label.asString))
 
     def bspTargets: IO[List[BspServer.Target]] =
       for
-        er <- runBazel("query", Some("kind(bsp_target, //...)"))
+        er <- runBazel(Command.Query, Some("kind(bsp_target, //...)"))
         stdout <- er.stdoutLines
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, BazelRunner.Ok)
+        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
       yield stdout.toList
         .map(BazelLabel.fromString)
         .collect { case Right(label) =>
@@ -134,7 +140,7 @@ object BazelRunner:
 
     def targetSources(target: BazelLabel): IO[List[String]] =
       for
-        er <- runBazel("build", target)
+        er <- runBazel(Command.Build, target)
         fs <- readSourceFile(target)
       yield fs
 
@@ -162,17 +168,30 @@ object BazelRunner:
       Stream
         .eval {
           for
-            er <- runBazel("build", label.allRulesResursive)
+            er <- runBazel(Command.Build, label.allRulesResursive)
             _ <- BazelRunner.raiseIfUnxpectedExit(
               er,
-              BazelRunner.Ok,
-              BazelRunner.BuildFailed
+              ExitCode.Ok,
+              ExitCode.BuildFailed
             )
           yield er
         }
         .flatMap { er =>
-          er.exitCode match
-            case BazelRunner.BuildFailed =>
+          ExitCode.fromCode(er.exitCode) match
+            case ExitCode.BuildFailed =>
               diagnostics
             case _ => Stream.empty
         }
+
+  end BazelRunnerImpl
+
+  case class BazelSources(sources: List[String], buildFiles: List[String])
+
+  object BazelSources:
+    given Decoder[BazelSources] = Decoder.instance { c =>
+      for
+        sources <- c.downField("sources").as[List[String]]
+        buildFiles <- c.downField("buildFiles").as[List[String]]
+      yield BazelSources(sources, buildFiles)
+    }
+
