@@ -13,7 +13,7 @@ import io.circe.syntax.*
 import io.circe.Json
 import afenton.bazel.bsp.Logger
 
-class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
+class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite:
 
   val noLog = Logger.noOp
 
@@ -96,9 +96,7 @@ class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite {
     forAll(GenMessage.genStream) { stream => }
   }
 
-}
-
-object GenMessage {
+object GenMessage:
 
   private val genMessage: Gen[String] =
     for
@@ -119,4 +117,3 @@ object GenMessage {
       val groups =
         ms.split("\r\n").grouped(n).map(ls => windowsLines(ls*)).toList
       Stream.emits(groups)
-}

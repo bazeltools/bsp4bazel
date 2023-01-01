@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 import cats.effect.IO
 import cats.effect.std.Console
 
-class SubProcessTest extends munit.CatsEffectSuite {
+class SubProcessTest extends munit.CatsEffectSuite: 
 
   test("should run a process until exit, and capture stdout/stderr") {
     val er1 = SubProcess
@@ -49,5 +49,3 @@ class SubProcessTest extends munit.CatsEffectSuite {
     assertEquals(outIO.unsafeRunSync(), s"123")
 
   }
-
-}

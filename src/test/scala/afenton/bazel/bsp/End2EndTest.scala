@@ -22,7 +22,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration._
 import scala.reflect.Typeable
 
-class End2EndTest extends munit.CatsEffectSuite with BspHelpers {
+class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
   override val munitTimeout = 1.minute
 
@@ -131,5 +131,3 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers {
         case d => fail(s"Wasn't expecting diagnostic $d")
       }
     }
-
-}

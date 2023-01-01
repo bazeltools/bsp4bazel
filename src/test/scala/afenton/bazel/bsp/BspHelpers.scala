@@ -22,7 +22,8 @@ import java.nio.file.Paths
 import scala.concurrent.duration._
 import scala.reflect.Typeable
 
-trait BspHelpers { self: munit.FunSuite =>
+trait BspHelpers:
+  self: munit.FunSuite =>
 
   extension [A](ls: List[A])
     def select[AA: Typeable]: AA =
@@ -73,5 +74,3 @@ trait BspHelpers { self: munit.FunSuite =>
 
   object MiniDiagnostic:
     def unapply(d: Diagnostic): MiniDiagnostic = new MiniDiagnostic(d)
-
-}

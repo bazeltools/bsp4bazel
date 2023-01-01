@@ -7,7 +7,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Prop.*
 
-class PartialJsonTest extends ScalaCheckSuite {
+class PartialJsonTest extends ScalaCheckSuite:
 
   def assertParsesAndEqual[T](
       result: Either[cats.parse.Parser.Error, T],
@@ -76,9 +76,8 @@ class PartialJsonTest extends ScalaCheckSuite {
     }
   }
 
-}
 
-object GenJson {
+object GenJson:
 
   private val genJValue: Gen[Json] =
     Gen.oneOf(
@@ -112,5 +111,3 @@ object GenJson {
 
   def gen: Gen[Json] =
     genJObject(1)
-
-}
