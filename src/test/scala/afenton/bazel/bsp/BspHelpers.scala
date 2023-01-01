@@ -5,8 +5,10 @@ import afenton.bazel.bsp.protocol.BuildServerCapabilities
 import afenton.bazel.bsp.protocol.BuildTargetIdentifier
 import afenton.bazel.bsp.protocol.CompileProvider
 import afenton.bazel.bsp.protocol.Diagnostic
+import afenton.bazel.bsp.protocol.DiagnosticSeverity
 import afenton.bazel.bsp.protocol.InitializeBuildResult
 import afenton.bazel.bsp.protocol.PublishDiagnosticsParams
+import afenton.bazel.bsp.protocol.Range
 import afenton.bazel.bsp.protocol.StatusCode
 import afenton.bazel.bsp.protocol.TaskFinishParams
 import afenton.bazel.bsp.protocol.TaskStartParams
@@ -19,8 +21,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration._
 import scala.reflect.Typeable
-import afenton.bazel.bsp.protocol.DiagnosticSeverity
-import afenton.bazel.bsp.protocol.Range
 
 trait BspHelpers { self: munit.FunSuite =>
 

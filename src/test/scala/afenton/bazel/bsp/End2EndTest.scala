@@ -12,6 +12,7 @@ import afenton.bazel.bsp.protocol.Range
 import afenton.bazel.bsp.protocol.StatusCode
 import afenton.bazel.bsp.protocol.TaskFinishParams
 import afenton.bazel.bsp.protocol.TaskStartParams
+import afenton.bazel.bsp.runner.BazelRunner
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -20,7 +21,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration._
 import scala.reflect.Typeable
-import afenton.bazel.bsp.runner.BazelRunner
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers {
 

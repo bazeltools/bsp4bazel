@@ -4,37 +4,26 @@ import afenton.bazel.bsp.jrpc.JRpcClient
 import afenton.bazel.bsp.jrpc.Message
 import afenton.bazel.bsp.jrpc.Notification
 import afenton.bazel.bsp.protocol.*
-import afenton.bazel.bsp.runner.BazelRunner
 import afenton.bazel.bsp.runner.BazelLabel
+import afenton.bazel.bsp.runner.BazelRunner
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.Queue
 import cats.syntax.all._
 import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
+import io.circe.Decoder
+import io.circe.DecodingFailure
+import io.circe.Json
 import io.circe.syntax._
 
 import java.net.URI
 import java.nio.file.Path
 import java.nio.file.Paths
-import io.circe.Json
-import io.circe.Decoder
-import io.circe.DecodingFailure
-
-case class ServerState(
-    targetSourceMap: TargetSourceMap,
-    currentErrors: List[FileDiagnostics],
-    workspaceRoot: Option[Path],
-    bazelRunner: Option[BazelRunner],
-    targets: List[BuildTarget]
-)
-
-object ServerState:
-  def default: ServerState = ServerState(TargetSourceMap.empty, Nil, None, None, Nil)
 
 class BazelBspServer(
     client: BspClient,
     logger: Logger,
-    stateRef: Ref[IO, ServerState]
+    stateRef: Ref[IO, BazelBspServer.ServerState]
 ) extends BspServer(client):
 
   private val version = "0.1"
@@ -78,7 +67,7 @@ class BazelBspServer(
         state.bazelRunner.get,
         ws.targets.map(_.id)
       )
-      _ <- stateRef.update(s => s.copy(targetSourceMap = TargetSourceMap(ts)))
+      _ <- stateRef.update(s => s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts)))
     yield ()
 
   def buildTargetInverseSources(
@@ -320,55 +309,43 @@ class BazelBspServer(
 
 end BazelBspServer
 
-class MyBspClient(stdOutQ: Queue[IO, Message], logger: Logger)
-    extends BspClient
-    with JRpcClient:
+object BazelBspServer: 
 
-  def sendNotification(n: Notification): IO[Unit] =
-    for
-      _ <- logger.info(n.method)
-      _ <- stdOutQ.offer(n)
-    yield ()
+  case class ServerState(
+      targetSourceMap: BazelBspServer.TargetSourceMap,
+      currentErrors: List[FileDiagnostics],
+      workspaceRoot: Option[Path],
+      bazelRunner: Option[BazelRunner],
+      targets: List[BuildTarget]
+  )
 
-  def publishDiagnostics(params: PublishDiagnosticsParams): IO[Unit] =
-    sendNotification("build/publishDiagnostics", params)
+  def defaultState: ServerState = 
+    ServerState(BazelBspServer.TargetSourceMap.empty, Nil, None, None, Nil)
 
-  def buildTaskStart(params: TaskStartParams): IO[Unit] =
-    sendNotification("build/taskStart", params)
+  protected case class TargetSourceMap(
+      val _targetSources: Map[BuildTargetIdentifier, List[
+        TextDocumentIdentifier
+      ]]
+  ):
 
-  def buildTaskProgress(params: TaskProgressParams): IO[Unit] =
-    sendNotification("build/taskProgress", params)
+    private def invertMap[K, V](map: Map[K, List[V]]): Map[V, List[K]] =
+      map.toList
+        .flatMap((bt, ls) => ls.map(l => (l, bt)))
+        .groupMap(_._1)(_._2)
 
-  def buildTaskFinished(params: TaskFinishParams): IO[Unit] =
-    sendNotification("build/taskFinish", params)
+    private val sourceTargets
+        : Map[TextDocumentIdentifier, List[BuildTargetIdentifier]] =
+      invertMap(_targetSources)
 
-  def buildShowMessage(params: ShowMessageParams): IO[Unit] =
-    sendNotification("build/showMessage", params)
+    def sourcesForTarget(
+        bt: BuildTargetIdentifier
+    ): List[TextDocumentIdentifier] =
+      _targetSources.get(bt).getOrElse(Nil)
 
-case class TargetSourceMap(
-    val _targetSources: Map[BuildTargetIdentifier, List[
-      TextDocumentIdentifier
-    ]]
-):
+    def targetsForSource(
+        td: TextDocumentIdentifier
+    ): List[BuildTargetIdentifier] =
+      sourceTargets.get(td).getOrElse(Nil)
 
-  private def invertMap[K, V](map: Map[K, List[V]]): Map[V, List[K]] =
-    map.toList
-      .flatMap((bt, ls) => ls.map(l => (l, bt)))
-      .groupMap(_._1)(_._2)
-
-  private val sourceTargets
-      : Map[TextDocumentIdentifier, List[BuildTargetIdentifier]] =
-    invertMap(_targetSources)
-
-  def sourcesForTarget(
-      bt: BuildTargetIdentifier
-  ): List[TextDocumentIdentifier] =
-    _targetSources.get(bt).getOrElse(Nil)
-
-  def targetsForSource(
-      td: TextDocumentIdentifier
-  ): List[BuildTargetIdentifier] =
-    sourceTargets.get(td).getOrElse(Nil)
-
-object TargetSourceMap:
-  def empty: TargetSourceMap = TargetSourceMap(Map.empty)
+  object TargetSourceMap:
+    def empty: TargetSourceMap = TargetSourceMap(Map.empty)

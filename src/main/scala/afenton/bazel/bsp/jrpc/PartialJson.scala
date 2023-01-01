@@ -1,6 +1,7 @@
 package afenton.bazel.bsp.jrpc
 
-import cats.parse.{Parser => P, Parser0 => P0}
+import cats.parse.{Parser => P}
+import cats.parse.{Parser0 => P0}
 
 sealed trait PartialJson:
   def asString: String

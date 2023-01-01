@@ -1,12 +1,12 @@
 package afenton.bazel.bsp.runner
 
 import cats.effect.IO
+import cats.effect.kernel.Resource
 import fs2.Stream
 
 import java.nio.file.Files
 import java.nio.file.Path
 import scala.concurrent.duration.FiniteDuration
-import cats.effect.kernel.Resource
 
 sealed trait SetEnv
 object SetEnv {

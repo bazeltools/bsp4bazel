@@ -4,6 +4,7 @@ import afenton.bazel.bsp.jrpc.Notification
 import afenton.bazel.bsp.jrpc.RpcFunction
 import afenton.bazel.bsp.jrpc.decodeIntOrString
 import afenton.bazel.bsp.jrpc.encodeIntOrString
+import afenton.bazel.bsp.runner.BazelLabel
 import cats.effect.IO
 import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics as ScalacDiagnostic
 import io.bazel.rules_scala.diagnostics.diagnostics.Position as ScalacPosition
@@ -16,7 +17,6 @@ import io.circe.syntax._
 import java.net.URI
 import java.nio.file.Path
 import java.nio.file.Paths
-import afenton.bazel.bsp.runner.BazelLabel
 
 object UriFactory:
   def fileUri(path: Path): URI =

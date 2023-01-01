@@ -247,7 +247,7 @@ case class LspTestProcess(workspaceRoot: Path):
           None,
           None
         )
-      ).marker("AFTER COMPILE IN LSP")
+      )
       resp <- dResp.get
     yield resp
 

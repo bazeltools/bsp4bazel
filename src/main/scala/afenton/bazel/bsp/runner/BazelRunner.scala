@@ -1,5 +1,8 @@
 package afenton.bazel.bsp.runner
 
+import afenton.bazel.bsp.FilesIO
+import afenton.bazel.bsp.Logger
+import afenton.bazel.bsp.protocol.BspServer
 import afenton.bazel.bsp.protocol.BuildTargetIdentifier
 import afenton.bazel.bsp.protocol.TextDocumentIdentifier
 import afenton.bazel.bsp.protocol.UriFactory
@@ -21,15 +24,12 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
-import afenton.bazel.bsp.FilesIO
-import afenton.bazel.bsp.Logger
-import scala.concurrent.duration.FiniteDuration
-import afenton.bazel.bsp.protocol.BspServer
 
 case class BazelSources(sources: List[String], buildFiles: List[String])
 object BazelSources:

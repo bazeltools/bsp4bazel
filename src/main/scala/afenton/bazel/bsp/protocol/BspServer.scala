@@ -1,7 +1,8 @@
 package afenton.bazel.bsp.protocol
 
-import cats.effect.IO
 import afenton.bazel.bsp.jrpc.RpcFunction
+import cats.effect.IO
+
 import java.net.URI
 
 trait BspServer(client: BspClient):

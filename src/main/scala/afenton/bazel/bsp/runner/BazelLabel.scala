@@ -1,17 +1,18 @@
 package afenton.bazel.bsp.runner
 
-import java.nio.file.Path
-import cats.parse.Parser as P
-import cats.parse.Parser0 as P0
-import cats.parse.Rfc5234
-import java.nio.file.Paths
 import afenton.bazel.bsp.protocol.BuildTargetIdentifier
-import cats.effect.kernel.syntax.resource
-import cats.instances.tailRec
-import scala.annotation.tailrec
-import afenton.bazel.bsp.runner.BPath.Wildcard
 import afenton.bazel.bsp.runner.BPath.BCons
 import afenton.bazel.bsp.runner.BPath.BNil
+import afenton.bazel.bsp.runner.BPath.Wildcard
+import cats.effect.kernel.syntax.resource
+import cats.instances.tailRec
+import cats.parse.Rfc5234
+import cats.parse.Parser as P
+import cats.parse.Parser0 as P0
+
+import java.nio.file.Path
+import java.nio.file.Paths
+import scala.annotation.tailrec
 
 sealed trait BazelTarget:
   def asString: String = this match

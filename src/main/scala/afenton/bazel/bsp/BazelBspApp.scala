@@ -102,9 +102,9 @@ object BazelBspApp
     val program = for
       errQ <- Queue.bounded[IO, String](100)
       outQ <- Queue.bounded[IO, Message](100)
-      logger = new QueueLogger(errQ, verbose)
-      client = new MyBspClient(outQ, logger)
-      stateRef <- Ref.of[IO, ServerState](ServerState.default)
+      logger = Logger.toQueue(errQ, verbose)
+      client = BspClient.toQueue(outQ, logger)
+      stateRef <- Ref.of[IO, BazelBspServer.ServerState](BazelBspServer.defaultState)
       server = new BazelBspServer(
         client,
         logger,

@@ -1,16 +1,17 @@
 package afenton.bazel.bsp
 
 import cats.effect.IO
-import java.nio.file.Path
-import java.nio.file.Files
-import scala.util.Try
-import scala.jdk.CollectionConverters.*
-import io.circe.Decoder
-import java.nio.file.PathMatcher
-import java.nio.file.FileVisitOption
 import fs2.Stream
-import java.nio.file.FileSystems
+import io.circe.Decoder
+
 import java.nio.file.FileSystem
+import java.nio.file.FileSystems
+import java.nio.file.FileVisitOption
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.PathMatcher
+import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 object FilesIO:
 

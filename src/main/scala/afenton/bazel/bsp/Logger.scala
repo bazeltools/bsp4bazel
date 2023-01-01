@@ -1,8 +1,9 @@
 package afenton.bazel.bsp
 
-import scala.io.AnsiColor
 import cats.effect.IO
 import cats.effect.std.Queue
+
+import scala.io.AnsiColor
 
 trait Logger:
   def trace(msg: String*): IO[Unit]
@@ -19,26 +20,29 @@ object Logger:
     def error(msgs: String*): IO[Unit] = trace(msgs*)
   }
 
-class QueueLogger(stdErrQ: Queue[IO, String], verbose: Boolean) extends Logger:
-  private def format(level: Logger.Level, msgs: Seq[String]) =
-    def fmt(level: String, color: String, msgs: Seq[String]) =
-      val withVisibleLineEndings =
-        msgs.map(_.replace("\r\n", "[CRLF]\n")).mkString("\n")
+  def toQueue(errQ: Queue[IO, String], verbose: Boolean): Logger =
+    QueueLogger(errQ, verbose)
 
-      s"[${color}${level}${AnsiColor.RESET}] ${color}${withVisibleLineEndings}${AnsiColor.RESET}"
+  private class QueueLogger(errQ: Queue[IO, String], verbose: Boolean) extends Logger:
+    private def format(level: Logger.Level, msgs: Seq[String]) =
+      def fmt(level: String, color: String, msgs: Seq[String]) =
+        val withVisibleLineEndings =
+          msgs.map(_.replace("\r\n", "[CRLF]\n")).mkString("\n")
 
-    level match {
-      case Logger.Level.Trace => fmt("trace", AnsiColor.CYAN, msgs)
-      case Logger.Level.Info  => fmt("info", AnsiColor.GREEN, msgs)
-      case Logger.Level.Error => fmt("error", AnsiColor.RED, msgs)
-    }
+        s"[${color}${level}${AnsiColor.RESET}] ${color}${withVisibleLineEndings}${AnsiColor.RESET}"
 
-  def trace(msgs: String*): IO[Unit] =
-    if verbose then stdErrQ.offer(format(Logger.Level.Trace, msgs))
-    else IO.unit
+      level match {
+        case Logger.Level.Trace => fmt("trace", AnsiColor.CYAN, msgs)
+        case Logger.Level.Info  => fmt("info", AnsiColor.GREEN, msgs)
+        case Logger.Level.Error => fmt("error", AnsiColor.RED, msgs)
+      }
 
-  def info(msgs: String*): IO[Unit] =
-    stdErrQ.offer(format(Logger.Level.Info, msgs))
+    def trace(msgs: String*): IO[Unit] =
+      if verbose then errQ.offer(format(Logger.Level.Trace, msgs))
+      else IO.unit
 
-  def error(msgs: String*): IO[Unit] =
-    stdErrQ.offer(format(Logger.Level.Error, msgs))
+    def info(msgs: String*): IO[Unit] =
+      errQ.offer(format(Logger.Level.Info, msgs))
+
+    def error(msgs: String*): IO[Unit] =
+      errQ.offer(format(Logger.Level.Error, msgs))

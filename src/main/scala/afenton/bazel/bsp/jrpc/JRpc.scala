@@ -1,5 +1,8 @@
 package afenton.bazel.bsp.jrpc
 
+import afenton.bazel.bsp.Logger
+import afenton.bazel.bsp.jrpc.PartialJson.JObject
+import afenton.bazel.bsp.protocol.BspClient
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.parse.Rfc5234
@@ -10,12 +13,10 @@ import fs2.Pipe
 import fs2.Pull
 import fs2.Stream
 import io.circe._
-import io.circe.syntax.*
-import afenton.bazel.bsp.jrpc.PartialJson.JObject
-import afenton.bazel.bsp.Logger
-import scala.reflect.TypeTest
 import io.circe.generic.semiauto.*
-import afenton.bazel.bsp.protocol.BspClient
+import io.circe.syntax.*
+
+import scala.reflect.TypeTest
 
 sealed trait Message:
   def jsonrpc: "2.0"
