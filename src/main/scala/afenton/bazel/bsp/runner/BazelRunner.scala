@@ -31,7 +31,6 @@ import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
 
-
 trait BazelRunner:
   def compile(target: BazelLabel): Stream[IO, FileDiagnostics]
   def clean: IO[Unit]
@@ -46,7 +45,7 @@ object BazelRunner:
     case BuildFailed extends ExitCode(1)
 
   object ExitCode:
-    def fromCode(code: Int): ExitCode = code match 
+    def fromCode(code: Int): ExitCode = code match
       case 0 => ExitCode.Ok
       case 1 => ExitCode.BuildFailed
 
@@ -68,23 +67,26 @@ object BazelRunner:
   case class BazelRunError(detailsMessage: String, exitCode: Int)
       extends Error(s"Bazel Run Failed: $exitCode\n$detailsMessage")
 
-  def default(workspaceRoot: Path, logger: Logger): BazelRunner =
-    BazelRunnerImpl(workspaceRoot, logger)
+  sealed trait BazelWrapper(val command: String)
+  object BazelWrapper:
+    case class At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
+    case object Default extends BazelWrapper("bazel")
 
-  private case class BazelRunnerImpl(workspaceRoot: Path, logger: Logger)
+    def default(workspaceRoot: Path): IO[BazelWrapper] =
+      IO.blocking {
+        List(
+          At(workspaceRoot.resolve("bazel-bsp")),
+          At(workspaceRoot.resolve("bazel"))
+        )
+          .find(wr => Files.exists(wr.path))
+          .getOrElse(Default)
+      }
+
+  def default(workspaceRoot: Path, bazelWrapper: BazelWrapper, logger: Logger): BazelRunner =
+    BazelRunnerImpl(workspaceRoot, bazelWrapper, logger)
+
+  private case class BazelRunnerImpl(workspaceRoot: Path, bazelWrapper: BazelWrapper, logger: Logger)
       extends BazelRunner:
-
-    def shutdown: IO[Unit] =
-      for
-        er <- runBazel(Command.Shutdown, None)
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
-      yield ()
-
-    def clean: IO[Unit] =
-      for
-        er <- runBazel(Command.Clean, None)
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
-      yield ()
 
     private def runBazel(
         command: Command,
@@ -92,12 +94,12 @@ object BazelRunner:
     ): IO[ExecutionResult] =
       for
         _ <- logger.info(
-          s"Running ./bazel ${command.asString} ${expr.getOrElse("_no_args_")}"
+          s"Running ${bazelWrapper.command} ${command.asString} ${expr.getOrElse("_no_args_")}"
         )
         er <- SubProcess
           .from(
             workspaceRoot,
-            "./bazel"
+            bazelWrapper.command
           )
           .withArgs(command.asString :: expr.toList)
           .runUntilExit
@@ -124,6 +126,18 @@ object BazelRunner:
             label.target.map(_.asString).getOrElse(label.asString)
           )
         }
+
+    def shutdown: IO[Unit] =
+      for
+        er <- runBazel(Command.Shutdown, None)
+        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
+      yield ()
+
+    def clean: IO[Unit] =
+      for
+        er <- runBazel(Command.Clean, None)
+        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
+      yield ()
 
     private def readSourceFile(target: BazelLabel): IO[List[String]] =
       val filePath = workspaceRoot
@@ -194,4 +208,3 @@ object BazelRunner:
         buildFiles <- c.downField("buildFiles").as[List[String]]
       yield BazelSources(sources, buildFiles)
     }
-

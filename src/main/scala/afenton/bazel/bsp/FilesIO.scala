@@ -69,3 +69,6 @@ object FilesIO:
         paths.filter(p => globMatcher.matches(p.getFileName))
       case None =>
         paths
+
+  def exists(file: Path): IO[Boolean] = 
+    IO.blocking(Files.exists(file))

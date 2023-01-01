@@ -35,10 +35,11 @@ class BazelBspServer(
     for
       _ <- logger.info("buildInitialize")
       workspaceRoot = Paths.get(params.rootUri)
+      bazelWrapper <- BazelRunner.BazelWrapper.default(workspaceRoot)
       _ <- stateRef.update(state =>
         state.copy(
           workspaceRoot = Some(workspaceRoot),
-          bazelRunner = Some(BazelRunner.default(workspaceRoot, logger))
+          bazelRunner = Some(BazelRunner.default(workspaceRoot, bazelWrapper, logger))
         )
       )
       resp <- IO.pure {

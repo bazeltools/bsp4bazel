@@ -30,7 +30,11 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
   def bazelEnv(workspaceRoot: Path) = FunFixture[(Path, BazelRunner)](
     setup = { test =>
-      val br = BazelRunner.default(workspaceRoot, Logger.noOp)
+      val br = BazelRunner.default(
+        workspaceRoot,
+        BazelRunner.BazelWrapper.default(workspaceRoot).unsafeRunSync(),
+        Logger.noOp
+      )
       (br.shutdown >> br.clean).unsafeRunSync()
       (workspaceRoot, br)
     },
