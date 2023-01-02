@@ -63,8 +63,12 @@ jobs:
         with:
           name: bazel-bsp-macos-x86
           path: downloads
+      - name: Show downloaded files (for debugging)
+        run: ls -R
+        working-directory: downloads
       - name: "Create release"
         uses: "marvinpinto/action-automatic-releases@latest"
+        prerelease: false
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           files: |
