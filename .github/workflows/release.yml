@@ -38,11 +38,15 @@ jobs:
       - name: Run native image
         run: |
           sbt graalvm-native-image:packageBin
+      - name: Rename output
+        run: mv target/graalvm-native-image/bazel-bsp ${{ matrix.artifact }} 
+      - name: Show file (for debugging)
+        run: ls -R
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.artifact }}
-          path: target/graalvm-native-image/bazel-bsp
+          path: ${{ matrix.artifact }}
   make_release:
     name: Make release
     needs: [make-binaries]
