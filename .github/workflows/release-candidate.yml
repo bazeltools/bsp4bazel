@@ -3,11 +3,13 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Build Release Candidate
+name: Automatic Release 
+
 on:
   push:
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
 jobs:
   make-binaries:
     strategy:
