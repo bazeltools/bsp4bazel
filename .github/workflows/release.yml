@@ -53,9 +53,21 @@ jobs:
         with:
           name: bazel-bsp-linux-ubuntu-20.04
           path: downloads
+      - name: Download linux 18.04
+        uses: actions/download-artifact@v1
+        with:
+          name: bazel-bsp-linux-ubuntu-18.04
+          path: downloads
+      - name: Download macos x86
+        uses: actions/download-artifact@v1
+        with:
+          name: bazel-bsp-macos-x86
+          path: downloads
       - name: "Create release"
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           files: |
-            downloads/bazel-bsp-linux-ubuntu-20.04.tgz
+            downloads/bazel-bsp-linux-ubuntu-20.04
+            downloads/bazel-bsp-linux-ubuntu-18.04
+            downloads/bazel-bsp-macos-x86
