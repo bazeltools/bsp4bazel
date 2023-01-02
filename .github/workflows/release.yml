@@ -68,9 +68,9 @@ jobs:
         working-directory: downloads
       - name: "Create release"
         uses: "marvinpinto/action-automatic-releases@latest"
-        prerelease: false
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
           files: |
             downloads/bazel-bsp-linux-ubuntu-20.04
             downloads/bazel-bsp-linux-ubuntu-18.04
