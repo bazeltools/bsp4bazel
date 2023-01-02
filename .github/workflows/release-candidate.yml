@@ -7,17 +7,26 @@ name: Build Release Candidate
 
 on:
   push:
-    branches: [ "main" ]
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  build:
+  make-binaries:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
-
-    name: Build Release Candidate for ${{ matrix.os }}
+        os: [macos-latest, ubuntu-20.04, ubuntu-18.04]
+        include:
+          - os: macos-latest
+            platform: macos-x86
+            artifact: bazel-bsp-macos-x86
+          - os: ubuntu-20.04
+            platform: linux-ubuntu-20.04
+            artifact: bazel-bsp-linux-ubuntu-20.04
+          - os: ubuntu-18.04
+            platform: linux-ubuntu-18.04
+            artifact: bazel-bsp-linux-ubuntu-18.04
+    name: Make binaries for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v3
       - uses: graalvm/setup-graalvm@v1
@@ -32,5 +41,21 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
-          name: bazel-bsp-${{ matrix.os }}
+          name: {{ matrix.artifact }}
           path: target/graalvm-native-image/bazel-bsp
+make_release:
+  name: Make release
+  needs: [make-binaries]
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/download-artifact@v1
+    - name: Download linux
+      with:
+        name: bazel-bsp-linux-ubuntu-20.04
+        path: downloads
+    - name: Create release
+    - uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        files: |
+          downloads/bazel-bsp-linux-ubuntu-20.04.tgz
