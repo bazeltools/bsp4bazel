@@ -51,7 +51,6 @@ jobs:
         with:
           name: bazel-bsp-linux-ubuntu-20.04
           path: downloads
-      - name: Create release
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
