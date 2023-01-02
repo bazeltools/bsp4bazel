@@ -26,9 +26,6 @@ class BazelBspServer(
     stateRef: Ref[IO, BazelBspServer.ServerState]
 ) extends BspServer(client):
 
-  private val version = "0.1"
-  private val bspVersion = "2.0.0-M2"
-
   def buildInitialize(
       params: InitializeBuildParams
   ): IO[InitializeBuildResult] =
@@ -47,8 +44,8 @@ class BazelBspServer(
 
         InitializeBuildResult(
           "Bazel",
-          version,
-          bspVersion,
+          BuildMetaData.Version,
+          BuildMetaData.BspVersion,
           BuildServerCapabilities(
             compileProvider = Some(compileProvider),
             inverseSourcesProvider = Some(true),

@@ -30,14 +30,13 @@ import io.circe.syntax.*
 
 import java.net.ServerSocket
 import java.nio.file.Paths
-
-val Version = "0.0.2-alpha"
+import cats.data.Nested
 
 object BazelBspApp
     extends CommandIOApp(
       name = "bazel-bsp",
       header = "Bazel BSP server",
-      version = Version
+      version = BuildMetaData.Version
     ):
 
   val verboseOpt =
@@ -45,16 +44,42 @@ object BazelBspApp
       .flag("verbose", help = "Include trace output on stderr")
       .orFalse
 
+  val verifySetupOpt =
+    Opts
+      .flag(
+        "verify",
+        help =
+          "Verifies that Bazel is correctly configured for use with Bazel BSP"
+      )
+      .orFalse
+
   val setupOpt =
     Opts
       .flag("setup", help = "write BSP configuration files into CWD")
       .orFalse
 
+  def printVerifyResult(
+      result: List[(String, Either[String, Unit])]
+  ): IO[Unit] =
+    IO.println(
+      result
+        .map {
+          case (n, Right(_))  => s"✅ $n"
+          case (n, Left(err)) => s"❌ $n\n   $err\n"
+        }
+        .mkString("\n")
+    )
+
   def main: Opts[IO[ExitCode]] =
-    (verboseOpt, setupOpt).mapN { (v, setup) =>
-      if setup then writeBspConfig(Version).as(ExitCode.Success)
+    (verboseOpt, verifySetupOpt, setupOpt).mapN { (verbose, verify, setup) =>
+      if setup then writeBspConfig(BuildMetaData.Version).as(ExitCode.Success)
+      else if verify then
+        for
+          result <- Verifier.validateSetup
+          _ <- printVerifyResult(result)
+        yield ExitCode.Success
       else
-        server(v)(
+        server(verbose)(
           fs2.io.stdinUtf8[IO](10_000),
           fs2.text.utf8.encode.andThen(fs2.io.stdout),
           fs2.text.utf8.encode.andThen(fs2.io.stderr)
@@ -68,7 +93,7 @@ object BazelBspApp
     }
 
   private def writeBspConfig(version: String): IO[Unit] =
-    val toPath = fs2.io.file.Path(".bsp/bazel-bsp.json") 
+    val toPath = fs2.io.file.Path(".bsp/bazel-bsp.json")
 
     Stream
       .emits(bspConfig(version).getBytes())
@@ -77,7 +102,11 @@ object BazelBspApp
       )
       .compile
       .drain
-      .flatMap(_ => Console[IO].println(s"Write setup config to ${toPath.toNioPath.toAbsolutePath()}"))
+      .flatMap(_ =>
+        Console[IO].println(
+          s"Write setup config to ${toPath.toNioPath.toAbsolutePath()}"
+        )
+      )
 
   private def bspConfig(version: String): String = """
 {
