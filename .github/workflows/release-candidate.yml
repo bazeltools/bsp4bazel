@@ -48,12 +48,13 @@ jobs:
     needs: [make-binaries]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v1
-      - name: Download linux
+      - name: Download linux 20.04
+        uses: actions/download-artifact@v1
         with:
           name: bazel-bsp-linux-ubuntu-20.04
           path: downloads
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - name: "Create release"
+        uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           files: |
