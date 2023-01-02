@@ -40,8 +40,6 @@ jobs:
           sbt graalvm-native-image:packageBin
       - name: Rename output
         run: mv target/graalvm-native-image/bazel-bsp ${{ matrix.artifact }} 
-      - name: Show file (for debugging)
-        run: ls -R
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
@@ -67,9 +65,6 @@ jobs:
         with:
           name: bazel-bsp-macos-x86
           path: downloads
-      - name: Show downloaded files (for debugging)
-        run: ls -R
-        working-directory: downloads
       - name: "Create release"
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
