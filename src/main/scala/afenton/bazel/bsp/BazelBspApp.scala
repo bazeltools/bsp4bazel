@@ -140,14 +140,6 @@ object BazelBspApp
         case u: Unit => IO.unit
       }
 
-  private def processErrStream(
-      errPipe: Pipe[IO, String, Unit],
-      errQ: Queue[IO, String]
-  ): Stream[IO, Unit] =
-    Stream
-      .fromQueueUnterminated(errQ, 100)
-      .through(errPipe)
-
   private def processOutStream(
       outPipe: Pipe[IO, String, Unit],
       outQ: Queue[IO, Message],
@@ -165,22 +157,15 @@ object BazelBspApp
       errPipe: Pipe[IO, String, Unit]
   ): IO[ExitCode] =
     val program = for
-      errQ <- Queue.bounded[IO, String](100)
+      loggerStream <- Logger.queue(100, errPipe, verbose)
+      (logger, logStream) = loggerStream
       outQ <- Queue.bounded[IO, Message](100)
-      logger = Logger.toQueue(errQ, verbose)
       client = BspClient.toQueue(outQ, logger)
-      stateRef <- Ref.of[IO, BazelBspServer.ServerState](
-        BazelBspServer.defaultState
-      )
-      server = new BazelBspServer(
-        client,
-        logger,
-        stateRef
-      )
+      server <- BazelBspServer.create(client, logger)
       all = Stream(
         processInStream(inStream, server, outQ, logger),
         processOutStream(outPipe, outQ, logger),
-        processErrStream(errPipe, errQ)
+        logStream
       ).parJoin(3)
       _ <- all.compile.drain
     yield ()

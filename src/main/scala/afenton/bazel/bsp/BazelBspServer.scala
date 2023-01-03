@@ -307,7 +307,7 @@ class BazelBspServer(
 
 end BazelBspServer
 
-object BazelBspServer: 
+object BazelBspServer:
 
   case class ServerState(
       targetSourceMap: BazelBspServer.TargetSourceMap,
@@ -317,8 +317,14 @@ object BazelBspServer:
       targets: List[BuildTarget]
   )
 
-  def defaultState: ServerState = 
+  def defaultState: ServerState =
     ServerState(BazelBspServer.TargetSourceMap.empty, Nil, None, None, Nil)
+
+  def create(client: BspClient, logger: Logger): IO[BazelBspServer] =
+    Ref.of[IO, BazelBspServer.ServerState](defaultState)
+      .map { stateRef =>
+        BazelBspServer(client, logger, stateRef)
+      }
 
   protected case class TargetSourceMap(
       val _targetSources: Map[BuildTargetIdentifier, List[
