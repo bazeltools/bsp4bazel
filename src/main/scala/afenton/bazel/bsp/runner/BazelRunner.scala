@@ -122,9 +122,7 @@ object BazelRunner:
     def bspTargets: IO[List[BspServer.Target]] =
       runBazelOk(Command.Query, Some("kind(bsp_target, //...)"))
         .use { er =>
-          for
-            stdout <- er.stdoutLines.compile.toList
-          yield stdout
+          er.stdoutLines
             .map(BazelLabel.fromString)
             .collect { case Right(label) =>
               BspServer.Target(
@@ -132,6 +130,8 @@ object BazelRunner:
                 label.target.map(_.asString).getOrElse(label.asString)
               )
             }
+            .compile
+            .toList
         }
 
     def shutdown: IO[Unit] =
