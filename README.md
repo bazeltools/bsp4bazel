@@ -39,8 +39,8 @@ And finally add at least one bsp target (although you can add as many as you lik
 load("@bazel-bsp-rules//bazel_rules:bsp_target.bzl", "bsp_target")
 
 bsp_target(
-    name = { A unique name for the Bsp target },
-    target = { The Bazel target to trigger },
+    name = "--> a unique name for the bsp target",
+    target = "--> the bazel target to trigger",
 )
 ```
 
