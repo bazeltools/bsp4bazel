@@ -23,10 +23,10 @@ Setup `scala_rules` to enable diagnostic files to be written. Instructions for t
 Add the bazel-bsp rules to your workspace
 
 ```starlark
-bazel_bsp_version = "10435c9e50969f66c3527ea19080bdfb7d649f7d"
+bazel_bsp_version = "537ad3a3425c5ac9145c7fb98b43b15593f7b4b3"
 http_archive(
     name = "bazel-bsp-rules",
-    sha256 = "bdf0160186b83b78824ccc2a0c88c93581884c2214e13138cd7a3374f403c2a4",
+    sha256 = "54cc2b198a1d61833a82477aea77268259156015765491f765192ffed22378c6",
     strip_prefix = "bazel-bsp-%s" % bazel_bsp_version,
     type = "zip",
     url = "https://github.com/aishfenton/bazel-bsp/archive/%s.zip" % bazel_bsp_version,
