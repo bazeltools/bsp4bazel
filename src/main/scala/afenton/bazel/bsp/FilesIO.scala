@@ -18,27 +18,21 @@ object FilesIO:
 
   private val fileSystem: FileSystem = FileSystems.getDefault
 
-  def cwd: IO[Path] = IO.blocking(Paths.get("").toAbsolutePath.normalize)
+  val cwd: IO[Path] = IO.blocking(Paths.get("").toAbsolutePath.normalize)
 
-  def readLines(file: Path): IO[Either[Throwable, List[String]]] =
-    IO.blocking {
-      Try {
-        Files.readAllLines(file).asScala.toList
-      }.toEither
-    }
+  def readLines(file: Path): IO[List[String]] =
+    IO.blocking(Files.readAllLines(file).asScala.toList)
 
-  def readBytes(file: Path): IO[Either[Throwable, Array[Byte]]] =
-    IO.blocking {
-      Try {
-        Files.readAllBytes(file)
-      }.toEither
-    }
+  def readBytes(file: Path): IO[Array[Byte]] =
+    IO.blocking(Files.readAllBytes(file))
 
-  def readJson[T: Decoder](file: Path): IO[Either[Throwable, T]] =
-    for lines <- readLines(file)
-    yield lines.map(_.mkString("\n")).flatMap { str =>
-      io.circe.parser.decode(str)
-    }
+  def readJson[T: Decoder](file: Path): IO[T] =
+    readLines(file)
+      .flatMap { lines =>
+        val allLines = lines.mkString("\n")
+        val decoded = io.circe.parser.decode(allLines)
+        IO.fromEither(decoded)
+      }
 
   /** Return a Stream[IO, Path] of files, by walking the filesystem (including
     * sub-dirs), from the given root down.
@@ -73,5 +67,5 @@ object FilesIO:
       case None =>
         paths
 
-  def exists(file: Path): IO[Boolean] = 
+  def exists(file: Path): IO[Boolean] =
     IO.blocking(Files.exists(file))

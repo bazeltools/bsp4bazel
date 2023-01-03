@@ -7,6 +7,7 @@ import afenton.bazel.bsp.protocol.BuildTargetIdentifier
 import afenton.bazel.bsp.protocol.TextDocumentIdentifier
 import afenton.bazel.bsp.protocol.UriFactory
 import cats.effect.IO
+import cats.effect.kernel.Resource
 import cats.syntax.all._
 import fs2.Stream
 import io.bazel.rules_scala.diagnostics.diagnostics.Diagnostic
@@ -91,72 +92,66 @@ object BazelRunner:
     private def runBazel(
         command: Command,
         expr: Option[String]
-    ): IO[ExecutionResult] =
+    ): Resource[IO, ExecutionResult] =
       for
-        _ <- logger.info(
+        _ <- Resource.eval(logger.info(
           s"Running ${bazelWrapper.command} ${command.asString} ${expr.getOrElse("_no_args_")}"
-        )
+        ))
         er <- SubProcess
           .from(
             workspaceRoot,
             bazelWrapper.command
           )
           .withArgs(command.asString :: expr.toList)
-          .runUntilExit
-          .timeout(FiniteDuration(30, TimeUnit.MINUTES))
-        _ <- logger.info(s"Exited with ${er.exitCode}")
+          .runUntilExit(FiniteDuration(30, TimeUnit.MINUTES))
+        _ <- Resource.eval(logger.info(s"Exited with ${er.exitCode}"))
+      yield er
+
+    private def runBazelOk(command: Command, expr: Option[String]): Resource[IO, ExecutionResult] =
+      for
+        er <- runBazel(command, expr)
+        _ <- Resource.eval(BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok))
       yield er
 
     private def runBazel(
         command: Command,
         label: BazelLabel
-    ): IO[ExecutionResult] =
+    ): Resource[IO, ExecutionResult] =
       runBazel(command, Some(label.asString))
 
     def bspTargets: IO[List[BspServer.Target]] =
-      for
-        er <- runBazel(Command.Query, Some("kind(bsp_target, //...)"))
-        stdout <- er.stdoutLines
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
-      yield stdout.toList
-        .map(BazelLabel.fromString)
-        .collect { case Right(label) =>
-          BspServer.Target(
-            UriFactory.bazelUri(label.asString),
-            label.target.map(_.asString).getOrElse(label.asString)
-          )
+      runBazelOk(Command.Query, Some("kind(bsp_target, //...)"))
+        .use { er =>
+          for
+            stdout <- er.stdoutLines.compile.toList
+          yield stdout
+            .map(BazelLabel.fromString)
+            .collect { case Right(label) =>
+              BspServer.Target(
+                UriFactory.bazelUri(label.asString),
+                label.target.map(_.asString).getOrElse(label.asString)
+              )
+            }
         }
 
     def shutdown: IO[Unit] =
-      for
-        er <- runBazel(Command.Shutdown, None)
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
-      yield ()
+      runBazelOk(Command.Shutdown, None).use_
 
     def clean: IO[Unit] =
-      for
-        er <- runBazel(Command.Clean, None)
-        _ <- BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok)
-      yield ()
+      runBazelOk(Command.Clean, None).use_
 
     private def readSourceFile(target: BazelLabel): IO[List[String]] =
       val filePath = workspaceRoot
         .resolve("bazel-bin")
         .resolve(target.packagePath.asPath)
         .resolve("sources.json")
-      for
-        json <- FilesIO.readJson[BazelSources](filePath)
-        sources <- json match {
-          case Right(bs) => IO.pure(bs.sources)
-          case Left(e)   => IO.raiseError(e)
-        }
-      yield sources
+      FilesIO.readJson[BazelSources](filePath).map(_.sources)
 
     def targetSources(target: BazelLabel): IO[List[String]] =
-      for
-        er <- runBazel(Command.Build, target)
-        fs <- readSourceFile(target)
-      yield fs
+      runBazel(Command.Build, target)
+        .use { _ =>
+          readSourceFile(target)
+        }
 
     private def diagnostics: Stream[IO, FileDiagnostics] =
       FilesIO
@@ -168,7 +163,7 @@ object BazelRunner:
         .flatMap { file =>
           Stream
             .eval {
-              FilesIO.readBytes(file).rethrow.map(TargetDiagnostics.parseFrom)
+              FilesIO.readBytes(file).map(TargetDiagnostics.parseFrom)
             }
             .flatMap { td =>
               Stream.fromIterator(
@@ -181,19 +176,19 @@ object BazelRunner:
     def compile(label: BazelLabel): Stream[IO, FileDiagnostics] =
       Stream
         .eval {
-          for
-            er <- runBazel(Command.Build, label.allRulesResursive)
-            _ <- BazelRunner.raiseIfUnxpectedExit(
-              er,
-              ExitCode.Ok,
-              ExitCode.BuildFailed
-            )
-          yield er
+          runBazel(Command.Build, label.allRulesResursive)
+            .use { er =>
+              BazelRunner.raiseIfUnxpectedExit(
+                er,
+                ExitCode.Ok,
+                ExitCode.BuildFailed
+              )
+              .as(er.exitCode)
+            }
         }
-        .flatMap { er =>
-          ExitCode.fromCode(er.exitCode) match
-            case ExitCode.BuildFailed =>
-              diagnostics
+        .flatMap { exitCode =>
+          ExitCode.fromCode(exitCode) match
+            case ExitCode.BuildFailed => diagnostics
             case _ => Stream.empty
         }
 

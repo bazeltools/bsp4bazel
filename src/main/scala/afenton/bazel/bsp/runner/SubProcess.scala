@@ -3,10 +3,11 @@ package afenton.bazel.bsp.runner
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import fs2.Stream
+import fs2.io.file.{Files => fs2Files, Path => fs2Path}
 
-import java.nio.file.Files
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.Duration
 
 sealed trait SetEnv
 object SetEnv {
@@ -18,15 +19,15 @@ object SetEnv {
 trait ExecutionResult {
   def exitCode: Int
   def workingDirectory: Path
-  def stdoutLines: IO[Seq[String]]
-  def stderrLines: IO[Seq[String]]
+  def stdoutLines: Stream[IO, String]
+  def stderrLines: Stream[IO, String]
   def command: String
   def commandArgs: List[String]
 
   def debugString: IO[String] =
     for {
-      stdoutLines <- stdoutLines
-      stderrLines <- stderrLines
+      stdoutLines <- stdoutLines.compile.toList
+      stderrLines <- stderrLines.compile.toList
     } yield s"""Exited with: ${exitCode}
          |workingDir:
          |${workingDirectory}
@@ -84,8 +85,8 @@ case class SubProcess(
       pb
     }
 
-  def redirectToTmp(pb: ProcessBuilder): IO[(Path, Path)] =
-    IO.blocking {
+  private def redirectToTmp(pb: ProcessBuilder): Resource[IO, (Path, Path)] =
+    Resource.make(IO.blocking {
 
       val stdout = {
         val stdout: Path = Files.createTempFile("stdout", ".log")
@@ -104,7 +105,11 @@ case class SubProcess(
         .redirectOutput(stdout.toFile)
 
       (stdout, stderr)
-
+    }) { case (out, err) =>
+      IO.blocking {
+        out.toFile.delete()
+        err.toFile.delete()
+      }
     }
 
   def start: Resource[IO, RunningProcess] =
@@ -112,18 +117,21 @@ case class SubProcess(
       for
         pb <- mkEnvironment
         process = pb.start()
-      yield RunningProcess(process)
-    }(_.exit)
+      yield process
+    } { process =>
+      IO.interruptibleMany(process.destroy())
+    }
+    .map(RunningProcess(_))
 
-  def runUntilExit: IO[ExecutionResult] =
+  def runUntilExit(duration: Duration): Resource[IO, ExecutionResult] =
     for
-      pb <- mkEnvironment
+      pb <- Resource.eval(mkEnvironment)
       files <- redirectToTmp(pb)
       (stdout, stderr) = files
-      exitCode <- IO.interruptibleMany {
+      exitCode <- Resource.eval(IO.interruptibleMany {
         val process: Process = pb.start()
         process.waitFor()
-      }
+      }.timeout(duration))
     yield SubProcess.FileExecutionResult(
       workingDirectory = workingDirectory,
       exitCode = exitCode,
@@ -143,13 +151,11 @@ object SubProcess:
       stdoutPath: Path,
       stderrPath: Path
   ) extends ExecutionResult {
-    def stdoutLines: IO[Seq[String]] = IO(
-      scala.io.Source.fromFile(stdoutPath.toFile).getLines().toStream
-    )
+    def stdoutLines: Stream[IO, String] =
+      fs2Files[IO].readAll(fs2Path.fromNioPath(stdoutPath)).through(fs2.text.utf8.decode)
 
-    def stderrLines: IO[Seq[String]] = IO(
-      scala.io.Source.fromFile(stderrPath.toFile).getLines().toStream
-    )
+    def stderrLines: Stream[IO, String] =
+      fs2Files[IO].readAll(fs2Path.fromNioPath(stderrPath)).through(fs2.text.utf8.decode)
   }
 
   def from(
@@ -159,7 +165,7 @@ object SubProcess:
   ): SubProcess =
     SubProcess(workingPath, command, args.toList, Map.empty, false)
 
-case class RunningProcess(process: Process):
+class RunningProcess(process: Process):
 
   def in(stdin: Stream[IO, String]): IO[Unit] =
     val fos = IO.blocking(process.getOutputStream)
@@ -181,6 +187,3 @@ case class RunningProcess(process: Process):
     fs2.io
       .readInputStream[IO](es, 1_000, false)
       .through(fs2.text.utf8.decode)
-
-  def exit: IO[Unit] =
-    IO.interruptibleMany(process.destroy())

@@ -6,27 +6,38 @@ import scala.concurrent.duration._
 import cats.effect.IO
 import cats.effect.std.Console
 
-class SubProcessTest extends munit.CatsEffectSuite: 
+class SubProcessTest extends munit.CatsEffectSuite:
 
   test("should run a process until exit, and capture stdout/stderr") {
-    val er1 = SubProcess
+    val (ec1, errLen1, out1) = SubProcess
       .from(Paths.get("/tmp"), "echo", "stdout")
-      .runUntilExit
+      .runUntilExit(Duration.Inf)
+      .use { er =>
+        for {
+          stdOut <- er.stdoutLines.compile.toList
+          stderrLen <- er.stderrLines.compile.fold(0) { (acc, _) => acc + 1 }
+        } yield (er.exitCode, stderrLen, stdOut)
+      }
       .unsafeRunSync()
 
-    assertEquals(er1.exitCode, 0)
-    assertEquals(er1.stderrLines.unsafeRunSync().length, 0)
-    assertEquals(er1.stdoutLines.unsafeRunSync(), Seq("stdout"))
+    assertEquals(ec1, 0)
+    assertEquals(errLen1, 0)
+    assertEquals(out1, List("stdout"))
 
-    val er2 = SubProcess
+    val (ec2, err2) = SubProcess
       .from(Paths.get("/tmp"), "ls", "doesnotexist")
-      .runUntilExit
+      .runUntilExit(Duration.Inf)
+      .use { er =>
+        for {
+          stderr <- er.stderrLines.compile.toList
+        } yield (er.exitCode, stderr)
+      }
       .unsafeRunSync()
 
     // Note: Specific exit code is different on Mac vs. Linux
-    assert(er2.exitCode > 0)
+    assert(ec2 > 0)
     assert(
-      er2.stderrLines.unsafeRunSync().head.endsWith("No such file or directory")
+      err2.head.endsWith("No such file or directory")
     )
   }
 
