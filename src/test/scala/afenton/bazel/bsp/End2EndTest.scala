@@ -24,7 +24,7 @@ import scala.reflect.Typeable
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
-  override val munitTimeout = 4.minute
+  override val munitTimeout = 2.minute
 
   val projectRoot = Paths.get("").toAbsolutePath
 

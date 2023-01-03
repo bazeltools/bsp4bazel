@@ -76,7 +76,10 @@ object BazelBspApp
   def main: Opts[IO[ExitCode]] =
     (verboseOpt, verifySetupOpt, setupOpt).mapN { (verbose, verify, setup) =>
       if setup then
-        writeBspConfig(Paths.get("").toAbsolutePath).as(ExitCode.Success)
+        for
+          cwd <- FilesIO.cwd
+          _ <- writeBspConfig(cwd)
+        yield ExitCode.Success
       else if verify then
         for
           result <- Verifier.validateSetup
@@ -99,21 +102,23 @@ object BazelBspApp
   def writeBspConfig(workspaceRoot: Path): IO[Unit] =
     val toPath = workspaceRoot.resolve(".bsp")
 
-    for 
-      _ <- Files[IO].createDirectories(toPath) 
+    for
+      _ <- Files[IO].createDirectories(toPath)
       _ <- Stream
         .emits(bspConfig.getBytes())
         .through(
           Files[IO].writeAll(
             toPath.resolve("bazel-bsp.json"),
-            List(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+            List(
+              StandardOpenOption.CREATE,
+              StandardOpenOption.TRUNCATE_EXISTING
+            )
           )
         )
         .compile
         .drain
       _ <- Console[IO].println(s"Wrote setup config to ${toPath}")
-    yield 
-      ()
+    yield ()
 
   private lazy val bspConfig: String = s"""
 {
