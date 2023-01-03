@@ -1,4 +1,4 @@
-load("//:sources_aspect.bzl", "SourceFiles", "collect_source_files_aspect")
+load(":sources_aspect.bzl", "SourceFiles", "collect_source_files_aspect")
 
 def _owner_to_bazel_file(fileLabel):
     workspace = fileLabel.workspace_root

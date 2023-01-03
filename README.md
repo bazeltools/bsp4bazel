@@ -27,7 +27,7 @@ bazel_bsp_version = "10435c9e50969f66c3527ea19080bdfb7d649f7d"
 http_archive(
     name = "bazel-bsp-rules",
     sha256 = "bdf0160186b83b78824ccc2a0c88c93581884c2214e13138cd7a3374f403c2a4",
-    strip_prefix = "bazel_bsp_version-%s" % bazel_bsp_version,
+    strip_prefix = "bazel-bsp-%s" % bazel_bsp_version,
     type = "zip",
     url = "https://github.com/aishfenton/bazel-bsp/archive/%s.zip" % bazel_bsp_version,
 )
