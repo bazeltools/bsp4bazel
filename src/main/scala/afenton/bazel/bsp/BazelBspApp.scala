@@ -12,8 +12,6 @@ import afenton.bazel.bsp.protocol.TextDocumentIdentifier
 import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.effect.IO
-import cats.effect.kernel.Ref
-import cats.effect.std.Console
 import cats.effect.std.Queue
 import cats.syntax.all.*
 import com.monovore.decline._
@@ -46,6 +44,21 @@ object BazelBspApp
     Opts
       .flag("verbose", help = "Include trace output on stderr")
       .orFalse
+      .map { verbose =>
+        server(verbose)(
+          fs2.io.stdinUtf8[IO](10_000),
+          fs2.text.utf8.encode.andThen(fs2.io.stdout),
+          fs2.text.utf8.encode.andThen(fs2.io.stderr)
+        )
+        .handleErrorWith { e =>
+          IO.blocking {
+            System.err.println(
+              s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
+            )
+            ExitCode.Error
+          }
+        }
+      }
 
   val verifySetupOpt =
     Opts
@@ -54,50 +67,36 @@ object BazelBspApp
         help =
           "Verifies that Bazel is correctly configured for use with Bazel BSP"
       )
-      .orFalse
-
-  val setupOpt =
-    Opts
-      .flag("setup", help = "write BSP configuration files into CWD")
-      .orFalse
-
-  def printVerifyResult(
-      result: List[(String, Either[String, Unit])]
-  ): IO[Unit] =
-    IO.println(
-      result
-        .map {
-          case (n, Right(_))  => s"✅ $n"
-          case (n, Left(err)) => s"❌ $n\n   $err\n"
-        }
-        .mkString("\n")
-    )
-
-  def main: Opts[IO[ExitCode]] =
-    (verboseOpt, verifySetupOpt, setupOpt).mapN { (verbose, verify, setup) =>
-      if setup then
-        for
-          cwd <- FilesIO.cwd
-          _ <- writeBspConfig(cwd)
-        yield ExitCode.Success
-      else if verify then
+      .as {
         for
           result <- Verifier.validateSetup
           _ <- printVerifyResult(result)
         yield ExitCode.Success
-      else
-        server(verbose)(
-          fs2.io.stdinUtf8[IO](10_000),
-          fs2.text.utf8.encode.andThen(fs2.io.stdout),
-          fs2.text.utf8.encode.andThen(fs2.io.stderr)
-        )
-          .handleError { case e =>
-            System.err.println(
-              s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
-            )
-            ExitCode.Error
-          }
-    }
+      }
+
+  val setupOpt =
+    Opts
+      .flag("setup", help = "write BSP configuration files into CWD")
+      .as {
+        for
+          cwd <- FilesIO.cwd
+          _ <- writeBspConfig(cwd)
+        yield ExitCode.Success
+      }
+
+  def printVerifyResult(
+      result: List[(String, Either[String, Unit])]
+  ): IO[Unit] =
+      result
+        .traverse_ {
+          case (n, Right(_))  => IO.println(s"✅ $n")
+          case (n, Left(err)) => IO.println(s"❌ $n\n   $err\n")
+        }
+
+  def main: Opts[IO[ExitCode]] =
+    verboseOpt
+      .orElse(verifySetupOpt)
+      .orElse(setupOpt)
 
   def writeBspConfig(workspaceRoot: Path): IO[Unit] =
     val toPath = workspaceRoot.resolve(".bsp")
@@ -117,7 +116,7 @@ object BazelBspApp
         )
         .compile
         .drain
-      _ <- Console[IO].println(s"Wrote setup config to ${toPath}")
+      _ <- IO.println(s"Wrote setup config to ${toPath}")
     yield ()
 
   private lazy val bspConfig: String = s"""
@@ -147,8 +146,7 @@ object BazelBspApp
       .through(messageDispatcher(BspServer.jsonRpcRouter(bspServer)))
       .evalTap(response => logger.trace(s"response: ${response}"))
       .evalMap {
-        case resp: Response =>
-          outQ.offer(resp)
+        case resp: Response => outQ.offer(resp)
         case u: Unit => IO.unit
       }
 
@@ -168,7 +166,7 @@ object BazelBspApp
       outPipe: Pipe[IO, String, Unit],
       errPipe: Pipe[IO, String, Unit]
   ): IO[ExitCode] =
-    val program = for
+    for
       loggerStream <- Logger.queue(100, errPipe, verbose)
       (logger, logStream) = loggerStream
       outQ <- Queue.bounded[IO, Message](100)
@@ -180,6 +178,4 @@ object BazelBspApp
         logStream
       ).parJoin(3)
       _ <- all.compile.drain
-    yield ()
-
-    program.as(ExitCode.Success)
+    yield ExitCode.Success
