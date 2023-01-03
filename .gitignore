@@ -2,7 +2,4 @@
 .metals
 .vscode
 target/
-bazel-bin
-bazel-*/
-bazel-out/
-bazel-testlogs/
+examples/**/bazel-*
