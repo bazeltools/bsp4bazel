@@ -103,7 +103,7 @@ object BazelRunner:
           )
           .withArgs(command.asString :: expr.toList)
           .runUntilExit
-          .timeout(FiniteDuration(30, TimeUnit.SECONDS))
+          .timeout(FiniteDuration(30, TimeUnit.MINUTES))
         _ <- logger.info(s"Exited with ${er.exitCode}")
       yield er
 

@@ -12,10 +12,13 @@ import java.nio.file.Path
 import java.nio.file.PathMatcher
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import java.nio.file.Paths
 
 object FilesIO:
 
   private val fileSystem: FileSystem = FileSystems.getDefault
+
+  def cwd: IO[Path] = IO.blocking(Paths.get("").toAbsolutePath.normalize)
 
   def readLines(file: Path): IO[Either[Throwable, List[String]]] =
     IO.blocking {

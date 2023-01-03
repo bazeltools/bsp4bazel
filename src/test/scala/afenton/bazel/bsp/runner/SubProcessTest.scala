@@ -23,7 +23,8 @@ class SubProcessTest extends munit.CatsEffectSuite:
       .runUntilExit
       .unsafeRunSync()
 
-    assertEquals(er2.exitCode, 2)
+    // Note: Specific exit code is different on Mac vs. Linux
+    assert(er2.exitCode > 0)
     assert(
       er2.stderrLines.unsafeRunSync().head.endsWith("No such file or directory")
     )

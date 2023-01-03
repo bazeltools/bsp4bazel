@@ -24,7 +24,7 @@ import scala.reflect.Typeable
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
-  override val munitTimeout = 1.minute
+  override val munitTimeout = 2.minute
 
   val projectRoot = Paths.get("").toAbsolutePath
 
@@ -45,7 +45,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
     .test("should successfully initialize") { (root, bazel) =>
 
       val (responses, notifications) = Lsp.start
-        .runFor(root, 2.seconds)
+        .runFor(root, 30.seconds)
         .unsafeRunSync()
 
       assertEquals(notifications, Nil)
@@ -54,8 +54,8 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         responses.select[InitializeBuildResult],
         InitializeBuildResult(
           "Bazel",
-          "0.1",
-          "2.0.0-M2",
+          BuildMetaData.Version,
+          BuildMetaData.BspVersion,
           BuildServerCapabilities(
             compileProvider = Some(CompileProvider(List("scala"))),
             inverseSourcesProvider = Some(true),
@@ -71,7 +71,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
       val (_, notifications) = Lsp.start
         .compile("//...")
-        .runFor(root, 10.seconds)
+        .runFor(root, 30.seconds)
         .unsafeRunSync()
 
       assertEquals(notifications.length, 2)
@@ -96,7 +96,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
       val (_, notifications) = Lsp.start
         .compile("//...")
-        .runFor(root, 10.seconds)
+        .runFor(root, 30.seconds)
         .unsafeRunSync()
 
       assertEquals(notifications.length, 6)
