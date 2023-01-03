@@ -1,48 +1,65 @@
 package afenton.bazel.bsp
 
+import fs2.{Pipe, Stream}
 import cats.effect.IO
-import cats.effect.std.Queue
+import cats.effect.std.{Queue, QueueSink}
 
 import scala.io.AnsiColor
 
 trait Logger:
-  def trace(msg: String*): IO[Unit]
-  def info(msg: String*): IO[Unit]
-  def error(msg: String*): IO[Unit]
+  def trace(msg: => String): IO[Unit]
+  def info(msg: => String): IO[Unit]
+  def error(msg: => String): IO[Unit]
 
 object Logger:
   enum Level:
     case Trace, Info, Error
 
-  def noOp = new Logger {
-    def trace(msgs: String*): IO[Unit] = IO { () }
-    def info(msgs: String*): IO[Unit] = trace(msgs*)
-    def error(msgs: String*): IO[Unit] = trace(msgs*)
+  val noOp: Logger = new Logger {
+    def trace(msgs: => String): IO[Unit] = IO.unit
+    def info(msgs: => String): IO[Unit] = IO.unit
+    def error(msgs: => String): IO[Unit] = IO.unit
   }
 
-  def toQueue(errQ: Queue[IO, String], verbose: Boolean): Logger =
-    QueueLogger(errQ, verbose)
+  def queue(size: Int, out: Pipe[IO, String, Unit], verbose: Boolean): IO[(Logger, Stream[IO, Unit])] =
+    Queue.bounded[IO, () => String](size)
+      .map { errQ =>
+        val logger = if verbose then QueueVerboseLogger(errQ) else QueueQuietLogger(errQ)
 
-  private class QueueLogger(errQ: Queue[IO, String], verbose: Boolean) extends Logger:
-    private def format(level: Logger.Level, msgs: Seq[String]) =
-      def fmt(level: String, color: String, msgs: Seq[String]) =
-        val withVisibleLineEndings =
-          msgs.map(_.replace("\r\n", "[CRLF]\n")).mkString("\n")
+        val resStream = Stream
+          .fromQueueUnterminated(errQ, size)
+          .through { s => out(s.map(_.apply())) }
 
-        s"[${color}${level}${AnsiColor.RESET}] ${color}${withVisibleLineEndings}${AnsiColor.RESET}"
-
-      level match {
-        case Logger.Level.Trace => fmt("trace", AnsiColor.CYAN, msgs)
-        case Logger.Level.Info  => fmt("info", AnsiColor.GREEN, msgs)
-        case Logger.Level.Error => fmt("error", AnsiColor.RED, msgs)
+        (logger, resStream)
       }
 
-    def trace(msgs: String*): IO[Unit] =
-      if verbose then errQ.offer(format(Logger.Level.Trace, msgs))
-      else IO.unit
+  private inline def fmt(inline level: String, inline color: String, msgs: String) =
+    val withVisibleLineEndings = msgs.replace("\r\n", "[CRLF]\n")
 
-    def info(msgs: String*): IO[Unit] =
-      errQ.offer(format(Logger.Level.Info, msgs))
+    s"[${color}${level}${AnsiColor.RESET}] ${color}${withVisibleLineEndings}${AnsiColor.RESET}"
 
-    def error(msgs: String*): IO[Unit] =
-      errQ.offer(format(Logger.Level.Error, msgs))
+  private inline def format(inline level: Logger.Level, msgs: String) =
+    inline level match {
+      case Logger.Level.Trace => fmt("trace", AnsiColor.CYAN, msgs)
+      case Logger.Level.Info  => fmt("info", AnsiColor.GREEN, msgs)
+      case Logger.Level.Error => fmt("error", AnsiColor.RED, msgs)
+    }
+
+  private class QueueVerboseLogger(errQ: QueueSink[IO, () => String]) extends Logger:
+    def trace(msgs: => String): IO[Unit] =
+      errQ.offer(() => format(Logger.Level.Trace, msgs))
+
+    def info(msgs: => String): IO[Unit] =
+      errQ.offer(() => format(Logger.Level.Info, msgs))
+
+    def error(msgs: => String): IO[Unit] =
+      errQ.offer(() => format(Logger.Level.Error, msgs))
+
+  private class QueueQuietLogger(errQ: QueueSink[IO, () => String]) extends Logger:
+    def trace(msgs: => String): IO[Unit] = IO.unit
+
+    def info(msgs: => String): IO[Unit] =
+      errQ.offer(() => format(Logger.Level.Info, msgs))
+
+    def error(msgs: => String): IO[Unit] =
+      errQ.offer(() => format(Logger.Level.Error, msgs))
