@@ -22,15 +22,18 @@ import fs2.Pipe
 import fs2.Stream
 import fs2.io.file.Files
 import fs2.io.file.Flags
-import fs2.io.file.Path
 import fs2.text
 import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
 import io.circe.Json
 import io.circe.syntax.*
 
 import java.net.ServerSocket
+import java.nio.file.Path
 import java.nio.file.Paths
 import cats.data.Nested
+import java.nio.file.StandardOpenOption
+import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.TimeUnit
 
 object BazelBspApp
     extends CommandIOApp(
@@ -72,7 +75,8 @@ object BazelBspApp
 
   def main: Opts[IO[ExitCode]] =
     (verboseOpt, verifySetupOpt, setupOpt).mapN { (verbose, verify, setup) =>
-      if setup then writeBspConfig(BuildMetaData.Version).as(ExitCode.Success)
+      if setup then
+        writeBspConfig(Paths.get("").toAbsolutePath).as(ExitCode.Success)
       else if verify then
         for
           result <- Verifier.validateSetup
@@ -92,27 +96,30 @@ object BazelBspApp
           }
     }
 
-  private def writeBspConfig(version: String): IO[Unit] =
-    val toPath = fs2.io.file.Path(".bsp/bazel-bsp.json")
+  def writeBspConfig(workspaceRoot: Path): IO[Unit] =
+    val toPath = workspaceRoot.resolve(".bsp")
 
-    Stream
-      .emits(bspConfig(version).getBytes())
-      .through(
-        fs2.io.file.Files[IO].writeAll(toPath)
-      )
-      .compile
-      .drain
-      .flatMap(_ =>
-        Console[IO].println(
-          s"Write setup config to ${toPath.toNioPath.toAbsolutePath()}"
+    for 
+      _ <- Files[IO].createDirectories(toPath) 
+      _ <- Stream
+        .emits(bspConfig.getBytes())
+        .through(
+          Files[IO].writeAll(
+            toPath.resolve("bazel-bsp.json"),
+            List(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+          )
         )
-      )
+        .compile
+        .drain
+      _ <- Console[IO].println(s"Wrote setup config to ${toPath}")
+    yield 
+      ()
 
-  private def bspConfig(version: String): String = """
+  private lazy val bspConfig: String = s"""
 {
     "name": "BazelBsp",
-    "version": "${version}",
-    "bspVersion": "2.1.0-M1",
+    "version": "${BuildMetaData.Version}",
+    "bspVersion": "${BuildMetaData.BspVersion}",
     "languages": [
         "scala"
     ],
