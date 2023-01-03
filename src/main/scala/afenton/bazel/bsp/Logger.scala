@@ -2,7 +2,7 @@ package afenton.bazel.bsp
 
 import fs2.{Pipe, Stream}
 import cats.effect.IO
-import cats.effect.std.Queue
+import cats.effect.std.{Queue, QueueSink}
 
 import scala.io.AnsiColor
 
@@ -45,7 +45,7 @@ object Logger:
       case Logger.Level.Error => fmt("error", AnsiColor.RED, msgs)
     }
 
-  private class QueueVerboseLogger(errQ: Queue[IO, () => String]) extends Logger:
+  private class QueueVerboseLogger(errQ: QueueSink[IO, () => String]) extends Logger:
     def trace(msgs: => String): IO[Unit] =
       errQ.offer(() => format(Logger.Level.Trace, msgs))
 
@@ -55,7 +55,7 @@ object Logger:
     def error(msgs: => String): IO[Unit] =
       errQ.offer(() => format(Logger.Level.Error, msgs))
 
-  private class QueueQuietLogger(errQ: Queue[IO, () => String]) extends Logger:
+  private class QueueQuietLogger(errQ: QueueSink[IO, () => String]) extends Logger:
     def trace(msgs: => String): IO[Unit] = IO.unit
 
     def info(msgs: => String): IO[Unit] =
