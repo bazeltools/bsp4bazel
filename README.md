@@ -1,8 +1,6 @@
 # Bazel BSP
 
-**===**
-**NOTE: WIP**
-**===**
+**NOTE: This is still an alpha version. And fairly new. See TODO below for what's still msising**
 
 This is a Bazel BSP Server, optimized to work with [Metals](https://scalameta.org/metals/) from the ground up.
 
@@ -47,8 +45,8 @@ bsp_target(
 # TODO
 
 - [x] Compile provider
+- [x] Make Bazel setup more straight forward
 - [ ] Generate SemanticDB files ([related](https://github.com/bazelbuild/rules_scala/issues/952))
 - [ ] Test provider
 - [ ] Run provider
 - [ ] Debug provider
-- [ ] Make Bazel setup more straight forward
