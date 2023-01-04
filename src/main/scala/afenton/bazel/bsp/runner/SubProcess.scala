@@ -152,10 +152,14 @@ object SubProcess:
       stderrPath: Path
   ) extends ExecutionResult {
     def stdoutLines: Stream[IO, String] =
-      fs2Files[IO].readAll(fs2Path.fromNioPath(stdoutPath)).through(fs2.text.utf8.decode)
+      fs2Files[IO].readAll(fs2Path.fromNioPath(stdoutPath))
+        .through(fs2.text.utf8.decode)
+        .through(fs2.text.lines)
 
     def stderrLines: Stream[IO, String] =
-      fs2Files[IO].readAll(fs2Path.fromNioPath(stderrPath)).through(fs2.text.utf8.decode)
+      fs2Files[IO].readAll(fs2Path.fromNioPath(stderrPath))
+        .through(fs2.text.utf8.decode)
+        .through(fs2.text.lines)
   }
 
   def from(

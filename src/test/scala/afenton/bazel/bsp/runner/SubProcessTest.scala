@@ -22,7 +22,7 @@ class SubProcessTest extends munit.CatsEffectSuite:
 
     assertEquals(ec1, 0)
     assertEquals(errLen1, 0)
-    assertEquals(out1, List("stdout"))
+    assertEquals(out1, List("stdout", ""))
 
     val (ec2, err2) = SubProcess
       .from(Paths.get("/tmp"), "ls", "doesnotexist")
