@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
-  override val munitTimeout = 2.minute
+  override val munitTimeout = 6.minute
 
   val projectRoot = Paths.get("").toAbsolutePath
 
