@@ -20,17 +20,13 @@ object FilesIO:
 
   val cwd: IO[Path] = IO.blocking(Paths.get("").toAbsolutePath.normalize)
 
-  def readLines(file: Path): IO[List[String]] =
-    IO.blocking(Files.readAllLines(file).asScala.toList)
-
   def readBytes(file: Path): IO[Array[Byte]] =
     IO.blocking(Files.readAllBytes(file))
 
   def readJson[T: Decoder](file: Path): IO[T] =
-    readLines(file)
-      .flatMap { lines =>
-        val allLines = lines.mkString("\n")
-        val decoded = io.circe.parser.decode(allLines)
+    readBytes(file)
+      .flatMap { bytes =>
+        val decoded = io.circe.parser.decode(new String(bytes, "utf-8"))
         IO.fromEither(decoded)
       }
 
