@@ -1,7 +1,6 @@
 package afenton.bazel.bsp.jrpc
 
 import afenton.bazel.bsp.Logger
-import afenton.bazel.bsp.jrpc.PartialJson.JObject
 import afenton.bazel.bsp.protocol.BspClient
 import cats.data.NonEmptyList
 import cats.effect.IO
@@ -200,7 +199,7 @@ case class RpcFunction[A: Decoder, B: Encoder](fn: A => IO[B]):
 
 object JRpcConsoleCodec {
 
-  val parser: P[JObject] = P.recursive[JObject] { recurse =>
+  val parser: P[JsonObject] = P.recursive[JsonObject] { recurse =>
     val clHeader: P[String] =
       P.string("Content-Length:") *> P.char(' ').? *> Rfc5234.digit
         .repAs[String]
@@ -211,8 +210,8 @@ object JRpcConsoleCodec {
     val headers: P[NonEmptyList[String]] =
       (P.oneOf(clHeader :: ctHeader :: Nil) <* P.string("\r\n")).rep
 
-    val body: P[JObject] =
-      PartialJson.Parsers.obj
+    val body: P[JsonObject] =
+      JsonParser.Parsers.obj
 
     (headers *> P.string("\r\n") *> body)
   }
@@ -221,7 +220,7 @@ object JRpcConsoleCodec {
     parser
       .parse(str)
       .flatMap { (a, b) =>
-        io.circe.parser.decode[Message](b.asString).map(b => (a, b))
+        Decoder[Message].decodeJson(Json.fromJsonObject(b)).map(b => (a, b))
       }
       .leftMap(_.toString)
 

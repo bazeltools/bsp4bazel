@@ -1,13 +1,13 @@
 package afenton.bazel.bsp.jrpc
 
 import cats.syntax.all.*
-import io.circe.Json
+import io.circe.{Json, JsonObject, JsonNumber}
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Prop.*
 
-class PartialJsonTest extends ScalaCheckSuite:
+class JsonParserTest extends ScalaCheckSuite:
 
   def assertParsesAndEqual[T](
       result: Either[cats.parse.Parser.Error, T],
@@ -17,9 +17,11 @@ class PartialJsonTest extends ScalaCheckSuite:
     case Right(t)  => assertEquals(t, expected)
   }
 
+  def num(str: String): Json = Json.fromJsonNumber(JsonNumber.fromDecimalStringUnsafe(str))
+
   test("should handle Json numbers") {
     // NB: In Json, numbers with fractional values must have digits before the decimal point
-    val result = PartialJson.parseAll("""{ 
+    val result = JsonParser.parseAll("""{
         "n1" : 210,
         "n2" : -210,
         "n3" : 0.05,
@@ -27,30 +29,26 @@ class PartialJsonTest extends ScalaCheckSuite:
       }""")
     assertParsesAndEqual(
       result,
-      PartialJson.JObject(
-        List(
-          "n1" -> PartialJson.JNumber("210"),
-          "n2" -> PartialJson.JNumber("-210"),
-          "n3" -> PartialJson.JNumber("0.05"),
-          "n4" -> PartialJson.JNumber("1.0E+2")
-        )
+      JsonObject(
+        "n1" -> num("210"),
+        "n2" -> num("-210"),
+        "n3" -> num("0.05"),
+        "n4" -> num("1.0E+2")
       )
     )
   }
 
   test("should handle escape chars in a string") {
-    val result = PartialJson.parseAll("""{ 
+    val result = JsonParser.parseAll("""{
         "escaped": "\"\b\t\r\n\\",
         "unicode": "\u6211\u662F\u5730\u7403\uD83C\uDF0D"
       }""")
     assertParsesAndEqual(
       result,
-      PartialJson.JObject(
-        List(
-          "escaped" -> PartialJson.JString("""\"\b\t\r\n\\"""),
-          "unicode" -> PartialJson.JString(
-            """\u6211\u662F\u5730\u7403\uD83C\uDF0D"""
-          )
+      JsonObject(
+          "escaped" -> Json.fromString("\"\b\t\r\n\\"),
+          "unicode" -> Json.fromString(
+            "\u6211\u662F\u5730\u7403\uD83C\uDF0D"
         )
       )
     )
@@ -58,7 +56,7 @@ class PartialJsonTest extends ScalaCheckSuite:
 
   test("should handle more content, after Json string") {
     val partial = """{"test":1},{"""
-    PartialJson.parse(partial) match {
+    JsonParser.parse(partial) match {
       case Left(err)     => fail(err.show)
       case Right((r, _)) => assertEquals(r, ",{")
     }
@@ -67,12 +65,11 @@ class PartialJsonTest extends ScalaCheckSuite:
   property("should parse valid Json") {
     forAll(GenJson.gen) { json =>
       val jsonStr = json.noSpaces
-      val result = PartialJson.parseAll(jsonStr)
-      assertEquals(result.isRight, true)
-      assertEquals(
-        io.circe.parser.parse(result.right.get.asString),
-        Right(json)
-      )
+      JsonParser.parseAll(jsonStr) match {
+        case Right(obj) =>
+          assertEquals(json, Json.fromJsonObject(obj))
+        case Left(err) => fail(err.toString)
+      }
     }
   }
 
