@@ -13,6 +13,7 @@ import io.circe.syntax.*
 import io.circe.Json
 import afenton.bazel.bsp.Logger
 
+import afenton.bazel.bsp.jrpc.GenJson
 class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite:
 
   val noLog = Logger.noOp

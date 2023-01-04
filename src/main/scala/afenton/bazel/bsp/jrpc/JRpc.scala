@@ -1,7 +1,6 @@
 package afenton.bazel.bsp.jrpc
 
 import afenton.bazel.bsp.Logger
-import afenton.bazel.bsp.jrpc.PartialJson.JObject
 import afenton.bazel.bsp.protocol.BspClient
 import cats.data.NonEmptyList
 import cats.effect.IO
@@ -139,7 +138,6 @@ def jRpcParser(logger: Logger): Pipe[IO, String, Message] =
   def go(
       remaining: String,
       stream: Stream[IO, String],
-      logger: Logger
   ): Pull[IO, Message, Unit] =
     stream.pull.uncons1.flatMap {
       case None =>
@@ -147,14 +145,14 @@ def jRpcParser(logger: Logger): Pipe[IO, String, Message] =
       case Some((h, t)) =>
         JRpcConsoleCodec.partialParse(remaining + h) match
           case Right((leftOver, json)) =>
-            Pull.output1(json) >> go(leftOver, t, logger)
+            Pull.output1(json) >> go(leftOver, t)
           case Left(err) =>
-            System.err.println(("RECURSE ERROR with ", err, remaining, h))
-            // Might be partial json string, so try with rest of stream
-            go(remaining + h, t, logger)
+            Pull.eval(logger.error(s"RECURSE ERROR with $err $remaining $h")) >>
+              // Might be partial json string, so try with rest of stream
+              go(remaining + h, t)
     }
 
-  (in: Stream[IO, String]) => go("", in, logger).stream
+  (in: Stream[IO, String]) => go("", in).stream
 
 object UnitJson:
   def unapply(json: Json): Boolean = json.asObject match
@@ -200,7 +198,7 @@ case class RpcFunction[A: Decoder, B: Encoder](fn: A => IO[B]):
 
 object JRpcConsoleCodec {
 
-  val parser: P[JObject] = P.recursive[JObject] { recurse =>
+  val parser: P[JsonObject] = P.recursive[JsonObject] { recurse =>
     val clHeader: P[String] =
       P.string("Content-Length:") *> P.char(' ').? *> Rfc5234.digit
         .repAs[String]
@@ -211,8 +209,8 @@ object JRpcConsoleCodec {
     val headers: P[NonEmptyList[String]] =
       (P.oneOf(clHeader :: ctHeader :: Nil) <* P.string("\r\n")).rep
 
-    val body: P[JObject] =
-      PartialJson.Parsers.obj
+    val body: P[JsonObject] =
+      JsonParser.Parsers.obj
 
     (headers *> P.string("\r\n") *> body)
   }
@@ -221,24 +219,24 @@ object JRpcConsoleCodec {
     parser
       .parse(str)
       .flatMap { (a, b) =>
-        io.circe.parser.decode[Message](b.asString).map(b => (a, b))
+        Decoder[Message].decodeJson(Json.fromJsonObject(b)).map(b => (a, b))
       }
       .leftMap(_.toString)
 
   def encode(msg: Message, includeContentType: Boolean): String =
     def cond(p: Boolean, e: String) =
-      if p then List(e) else Nil
+      if p then (e :: Nil) else Nil
 
     val jsonStr = msg.asJson.deepDropNullValues.noSpaces
     val lines =
-      List(
-        s"Content-Length: ${jsonStr.length}"
-      ) ++ cond(
+      s"Content-Length: ${jsonStr.length}" ::
+      cond(
         includeContentType,
         "Content-Type: application/vscode-jsonrpc; charset=utf-8"
-      ) ++ List(
-        "",
-        jsonStr
+      ) ::: (
+        "" ::
+        jsonStr ::
+        Nil
       )
 
     windowsLines(lines*)
