@@ -149,7 +149,7 @@ case class LspTestProcess(workspaceRoot: Path):
       stream
         .evalMap {
           case n: Notification => IO.pure(n)
-          case resp: Response => IO.pure(resp) 
+          case resp: Response => IO.pure(resp)
           case req: Request => IO.raiseError(new Exception(s"Didn't expect to get a request here. Got $req"))
         }
   }
@@ -216,21 +216,21 @@ case class LspTestProcess(workspaceRoot: Path):
       client = BspClient(openRequests, bspInQ, counter)
       exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
 
-      fibOut <- processBspOut(
-        Stream.fromQueueUnterminated(bspOutQ),
-        openRequests,
-        exitSwitch
-      ).start
       fibErr <- processBspErr(Stream.fromQueueUnterminated(bspErrQ)).start
       fibServer <- bspServer.start
 
-      resp <- processActions(client, actions, exitSwitch)
+      bspOutIO = processBspOut(
+        Stream.fromQueueUnterminated(bspOutQ),
+        openRequests,
+        exitSwitch
+      )
 
-      notifications <- fibOut.joinWith(IO.raiseError(new Exception("Unexpected cancelation")))
+      respNotes <- IO.both(processActions(client, actions, exitSwitch), bspOutIO)
+      (resp, notifications) = respNotes
       _ <- fibErr.cancel
       _ <- fibServer.cancel
 
-    yield 
+    yield
       (resp, notifications)
 
   private def start(client: BspClient): IO[InitializeBuildResult] =

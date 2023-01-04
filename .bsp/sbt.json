@@ -1,1 +1,0 @@
-{"name":"sbt","version":"1.8.0","bspVersion":"2.1.0-M1","languages":["scala"],"argv":["/usr/lib/jvm/zulu-8-amd64/jre/bin/java","-Xms100m","-Xmx100m","-classpath","/vol/src/bazel-bsp/.bsp/sbt-launch.jar","xsbt.boot.Boot","-bsp","--sbt-launch-jar=/vol/src/bazel-bsp/.bsp/sbt-launch.jar"]}
