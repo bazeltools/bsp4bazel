@@ -148,10 +148,8 @@ object BazelRunner:
       FilesIO.readJson[BazelSources](filePath).map(_.sources)
 
     def targetSources(target: BazelLabel): IO[List[String]] =
-      runBazel(Command.Build, target)
-        .use { _ =>
-          readSourceFile(target)
-        }
+      runBazel(Command.Build, target).use_ *>
+        readSourceFile(target)
 
     private def diagnostics: Stream[IO, FileDiagnostics] =
       FilesIO
