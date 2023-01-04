@@ -199,7 +199,7 @@ class BazelBspServer(
             PublishDiagnosticsParams
               .fromScalacDiagnostic(root, target, fd))
         )
-      _ <- clearDiagnostics.map(client.publishDiagnostics).sequence_
+      _ <- clearDiagnostics.traverse_(client.publishDiagnostics)
       _ <- stateRef.update(_.copy(currentErrors = fds))
     yield ()
 
@@ -239,7 +239,7 @@ class BazelBspServer(
       _ <- logger.info(
         s"Compiling targets: ${params.targets.map(_.uri.toString).mkString(",")}"
       )
-      _ <- params.targets.map(compileTarget).sequence_
+      _ <- params.targets.traverse_(compileTarget)
     yield ()
 
   def buildShutdown(params: Unit): IO[Unit] =
@@ -260,7 +260,7 @@ class BazelBspServer(
       targets: List[BuildTargetIdentifier]
   ): IO[Map[BuildTargetIdentifier, List[TextDocumentIdentifier]]] =
     targets
-      .map { bt =>
+      .traverse { bt =>
         BazelLabel.fromBuildTargetIdentifier(bt) match
           case Right(bazelTarget) =>
             bazelRunner
@@ -269,7 +269,6 @@ class BazelBspServer(
           case Left(err) =>
             IO.raiseError(err)
       }
-      .sequence
       .map(_.toMap)
 
   def buildTargetSource(params: SourcesParams): IO[SourcesResult] =
