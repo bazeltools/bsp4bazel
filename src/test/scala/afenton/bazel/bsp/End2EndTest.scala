@@ -20,7 +20,6 @@ import io.circe.syntax.*
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration._
-import scala.reflect.Typeable
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
