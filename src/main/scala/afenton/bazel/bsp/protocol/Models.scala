@@ -6,6 +6,7 @@ import afenton.bazel.bsp.jrpc.decodeIntOrString
 import afenton.bazel.bsp.jrpc.encodeIntOrString
 import afenton.bazel.bsp.runner.BazelLabel
 import cats.effect.IO
+import cats.syntax.all._
 import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics as ScalacDiagnostic
 import io.bazel.rules_scala.diagnostics.diagnostics.Position as ScalacPosition
 import io.bazel.rules_scala.diagnostics.diagnostics.Range as ScalacRange
@@ -204,7 +205,7 @@ object StatusCode:
   given Encoder[StatusCode] =
     Encoder.instance(_.id.asJson)
   given Decoder[StatusCode] =
-    Decoder[Int].map { 
+    Decoder[Int].map {
       case 1 => StatusCode.Ok
       case 2 => StatusCode.Error
       case 3 => StatusCode.Cancelled
@@ -373,30 +374,35 @@ object PublishDiagnosticsParams:
       baseDir: Path,
       bt: BuildTargetIdentifier,
       fd: ScalacDiagnostic
-  ): PublishDiagnosticsParams =
-    val diagnostics = fd.diagnostics.toList.map { scalacD =>
-      Diagnostic(
-        Range.fromScalacRange(scalacD.range.get),
-        Some(DiagnosticSeverity.fromScalacSeverity(scalacD.severity)),
-        Some(1),
+  ): Option[PublishDiagnosticsParams] =
+    fd.diagnostics.toList.traverse { scalacD =>
+      scalacD.range.flatMap(Range.fromScalacRange(_))
+        .map {
+          Diagnostic(
+            _,
+            Some(DiagnosticSeverity.fromScalacSeverity(scalacD.severity)),
+            Some(1),
+            None,
+            Some("Scalac"),
+            scalacD.message,
+            None,
+            None,
+            None
+          )
+        }
+    }
+    .map { diagnostics =>
+      val path = fd.path.toString
+        .replaceFirst("^workspace-root://", baseDir.toUri.toString)
+
+      PublishDiagnosticsParams(
+        TextDocumentIdentifier(new URI(path)),
+        bt,
         None,
-        Some("Scalac"),
-        scalacD.message,
-        None,
-        None,
-        None
+        diagnostics,
+        true
       )
     }
-    val path = fd.path.toString
-      .replaceFirst("^workspace-root://", baseDir.toUri.toString)
-
-    PublishDiagnosticsParams(
-      TextDocumentIdentifier(new URI(path)),
-      bt,
-      None,
-      diagnostics,
-      true
-    )
 
 case class TextDocumentIdentifier(uri: URI)
 
@@ -404,10 +410,10 @@ object TextDocumentIdentifier:
   given Codec[TextDocumentIdentifier] =
     deriveCodec[TextDocumentIdentifier]
 
-  def file(file: Path): TextDocumentIdentifier = 
+  def file(file: Path): TextDocumentIdentifier =
     TextDocumentIdentifier(UriFactory.fileUri(file))
 
-  def file(file: String): TextDocumentIdentifier = 
+  def file(file: String): TextDocumentIdentifier =
     this.file(Paths.get(file))
 
 
@@ -491,25 +497,25 @@ object Range:
   given Codec[Range] =
     deriveCodec[Range]
 
-  def fromScalacRange(rng: ScalacRange): Range =
+  def fromScalacRange(rng: ScalacRange): Option[Range] =
     (rng.start, rng.end) match
       case (Some(start), Some(end)) =>
-        Range(
+        Some(Range(
           Position.fromScalacPosition(start),
           Position.fromScalacPosition(end)
-        )
+        ))
       case (Some(start), None) =>
-        Range(
+        Some(Range(
           Position.fromScalacPosition(start),
           Position.fromScalacPosition(start)
-        )
+        ))
       case (None, Some(end)) =>
-        Range(
+        Some(Range(
           Position.fromScalacPosition(end),
           Position.fromScalacPosition(end)
-        )
+        ))
       case (None, None) =>
-        throw new Exception(s"Diagnostic is missing position")
+        None
 
 case class Position(line: Int, character: Int)
 object Position:
@@ -569,7 +575,7 @@ enum TaskDataKind(val id: String):
 
 object TaskDataKind:
   given Encoder[TaskDataKind] = Encoder.instance(_.id.asJson)
-  given Decoder[TaskDataKind] = Decoder[String].map { 
+  given Decoder[TaskDataKind] = Decoder[String].map {
     case "compile-task" => TaskDataKind.CompileTask
     case "compile-report" => TaskDataKind.CompileReport
     case "test-task" => TaskDataKind.TestTask

@@ -183,11 +183,10 @@ case class LspTestProcess(workspaceRoot: Path):
       client: BspClient,
       actions: List[Lsp.Action]
   ): IO[List[Matchable]] =
-    for results <- actions.map {
-        case Action.Start           => start(client)
-        case Action.Compile(target) => compile(client, target)
-      }.sequence
-    yield results
+    actions.traverse {
+      case Action.Start           => start(client)
+      case Action.Compile(target) => compile(client, target)
+    }
 
   def runFor(
       actions: List[Lsp.Action],
@@ -232,7 +231,7 @@ case class LspTestProcess(workspaceRoot: Path):
       d2 <- client.buildInitialized(())
       _ <- d2.get
     yield resp
- 
+
   extension [A](io: IO[A])
     def marker(str: String) = io.map { a => System.err.println(str + s" WITH: $a");  a }
 
@@ -254,11 +253,11 @@ case class LspTestProcess(workspaceRoot: Path):
 case class Lsp(actions: Vector[Lsp.Action]):
 
   def :+(a: Lsp.Action): Lsp = copy(actions :+ a)
-  def start: Lsp = 
+  def start: Lsp =
     this :+ Lsp.Action.Start
 
   def compile(target: String): Lsp =
-    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target)) 
+    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target))
 
   def runFor(
       workspaceRoot: Path,
