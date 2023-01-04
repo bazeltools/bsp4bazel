@@ -138,7 +138,6 @@ def jRpcParser(logger: Logger): Pipe[IO, String, Message] =
   def go(
       remaining: String,
       stream: Stream[IO, String],
-      logger: Logger
   ): Pull[IO, Message, Unit] =
     stream.pull.uncons1.flatMap {
       case None =>
@@ -146,14 +145,14 @@ def jRpcParser(logger: Logger): Pipe[IO, String, Message] =
       case Some((h, t)) =>
         JRpcConsoleCodec.partialParse(remaining + h) match
           case Right((leftOver, json)) =>
-            Pull.output1(json) >> go(leftOver, t, logger)
+            Pull.output1(json) >> go(leftOver, t)
           case Left(err) =>
-            System.err.println(("RECURSE ERROR with ", err, remaining, h))
-            // Might be partial json string, so try with rest of stream
-            go(remaining + h, t, logger)
+            Pull.eval(logger.error(s"RECURSE ERROR with $err $remaining $h")) >>
+              // Might be partial json string, so try with rest of stream
+              go(remaining + h, t)
     }
 
-  (in: Stream[IO, String]) => go("", in, logger).stream
+  (in: Stream[IO, String]) => go("", in).stream
 
 object UnitJson:
   def unapply(json: Json): Boolean = json.asObject match
@@ -226,18 +225,18 @@ object JRpcConsoleCodec {
 
   def encode(msg: Message, includeContentType: Boolean): String =
     def cond(p: Boolean, e: String) =
-      if p then List(e) else Nil
+      if p then (e :: Nil) else Nil
 
     val jsonStr = msg.asJson.deepDropNullValues.noSpaces
     val lines =
-      List(
-        s"Content-Length: ${jsonStr.length}"
-      ) ++ cond(
+      s"Content-Length: ${jsonStr.length}" ::
+      cond(
         includeContentType,
         "Content-Type: application/vscode-jsonrpc; charset=utf-8"
-      ) ++ List(
-        "",
-        jsonStr
+      ) ::: (
+        "" ::
+        jsonStr ::
+        Nil
       )
 
     windowsLines(lines*)
