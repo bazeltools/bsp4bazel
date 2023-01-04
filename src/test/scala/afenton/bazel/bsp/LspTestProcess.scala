@@ -144,6 +144,16 @@ case class LspTestProcess(workspaceRoot: Path):
 
   private val logger: Logger = Logger.noOp
 
+  private def checkOutputType: Pipe[IO, Message, Response | Notification] = {
+    (stream: Stream[IO, Message]) =>
+      stream
+        .evalMap {
+          case n: Notification => IO.pure(n)
+          case resp: Response => IO.pure(resp) 
+          case req: Request => IO.raiseError(new Exception(s"Didn't expect to get a request here. Got $req"))
+        }
+  }
+
   private def processBspOut(
       outStream: Stream[IO, String],
       openRequestsRef: Ref[IO, OpenRequests],
@@ -151,11 +161,12 @@ case class LspTestProcess(workspaceRoot: Path):
   ): IO[List[Notification]] =
     outStream
       .through(jRpcParser(logger))
+      .through(checkOutputType)
       .evalFilter {
         case resp @ Response(jsonrpc, id, result, error) =>
           for
             or <- openRequestsRef.get
-            deferred = or.get(id.get.toString).get
+            deferred <- IOLifts.fromOption(or.get(id.get.toString))
             result <- deferred
               .complete(resp)
               .ifM(
@@ -164,9 +175,7 @@ case class LspTestProcess(workspaceRoot: Path):
               )
           yield false
 
-        case n: Notification => IO.pure(true)
-
-        case _ => IO.raiseError(new Exception("Shouldn't get here"))
+        case _: Notification => IO.pure(true)
       }
       .interruptWhen(exitSwitch)
       .collect { case n: Notification => n }
@@ -185,10 +194,10 @@ case class LspTestProcess(workspaceRoot: Path):
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[Matchable]] =
     actions.traverse {
-        case Action.Start           => start(client)
-        case Action.Shutdown        => shutdown(client, exitSwitch)
-        case Action.Compile(target) => compile(client, target)
-      }
+      case Action.Start           => start(client)
+      case Action.Shutdown        => shutdown(client, exitSwitch)
+      case Action.Compile(target) => compile(client, target)
+    }
 
   def runIn(
       actions: List[Lsp.Action]
@@ -206,19 +215,23 @@ case class LspTestProcess(workspaceRoot: Path):
       counter <- Ref.of[IO, Int](1)
       client = BspClient(openRequests, bspInQ, counter)
       exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
-      result = IO.both(
-        processActions(client, actions, exitSwitch),
-        IO.race(
-          processBspOut(
-            Stream.fromQueueUnterminated(bspOutQ),
-            openRequests,
-            exitSwitch
-          ),
-          processBspErr(Stream.fromQueueUnterminated(bspErrQ))
-        ).map(_.left.get)
-      )
-      out <- IO.race(bspServer, result)
-    yield out.right.get
+
+      fibOut <- processBspOut(
+        Stream.fromQueueUnterminated(bspOutQ),
+        openRequests,
+        exitSwitch
+      ).start
+      fibErr <- processBspErr(Stream.fromQueueUnterminated(bspErrQ)).start
+      fibServer <- bspServer.start
+
+      resp <- processActions(client, actions, exitSwitch)
+
+      notifications <- fibOut.joinWith(IO.raiseError(new Exception("Unexpected cancelation")))
+      _ <- fibErr.cancel
+      _ <- fibServer.cancel
+
+    yield 
+      (resp, notifications)
 
   private def start(client: BspClient): IO[InitializeBuildResult] =
     for
