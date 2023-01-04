@@ -87,8 +87,11 @@ case class BspClient(
   def buildInitialized(params: Unit): IO[DeferredSource[IO, Unit]] =
     sendRequest("build/initialized", params)
 
-  // def buildShutdown(params: Unit): IO[Unit]
-  // def buildExit(params: Unit): IO[Unit]
+  def buildShutdown(params: Unit): IO[DeferredSource[IO, Unit]] =
+    sendRequest("build/shutdown", params)
+
+  // def buildExit(params: Unit): IO[Unit] =
+  //   sendRequest("build/exit", params)
 
   // def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult]
 
@@ -143,7 +146,7 @@ case class LspTestProcess(workspaceRoot: Path):
   private def processBspOut(
       outStream: Stream[IO, String],
       openRequestsRef: Ref[IO, OpenRequests],
-      duration: FiniteDuration
+      exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[Notification]] =
     outStream
       .through(jRpcParser(logger))
@@ -164,34 +167,31 @@ case class LspTestProcess(workspaceRoot: Path):
 
         case _ => IO.raiseError(new Exception("Shouldn't get here"))
       }
+      .interruptWhen(exitSwitch)
       .collect { case n: Notification => n }
-      .interruptAfter(duration)
       .compile
       .toList
 
-  private def processBspErr(
-      errStream: Stream[IO, String],
-      duration: FiniteDuration
-  ): IO[Unit] =
+  private def processBspErr(errStream: Stream[IO, String]): IO[Unit] =
     errStream
       .evalMap(str => Console[IO].errorln(str))
-      .interruptAfter(duration)
       .compile
       .drain
 
   private def processActions(
       client: BspClient,
-      actions: List[Lsp.Action]
+      actions: List[Lsp.Action],
+      exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[Matchable]] =
     for results <- actions.map {
         case Action.Start           => start(client)
+        case Action.Shutdown        => shutdown(client, exitSwitch)
         case Action.Compile(target) => compile(client, target)
       }.sequence
     yield results
 
-  def runFor(
-      actions: List[Lsp.Action],
-      duration: FiniteDuration
+  def runIn(
+      actions: List[Lsp.Action]
   ): IO[(List[Matchable], List[Notification])] =
     for
       bspOutQ <- Queue.bounded[IO, String](1_000)
@@ -205,13 +205,17 @@ case class LspTestProcess(workspaceRoot: Path):
       openRequests <- Ref.of[IO, OpenRequests](Map.empty)
       counter <- Ref.of[IO, Int](1)
       client = BspClient(openRequests, bspInQ, counter)
+      exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
       result = IO.both(
-        processActions(client, actions),
-        (processBspOut(
-          Stream.fromQueueUnterminated(bspOutQ),
-          openRequests,
-          duration
-        ) <& processBspErr(Stream.fromQueueUnterminated(bspErrQ), duration))
+        processActions(client, actions, exitSwitch),
+        IO.race(
+          processBspOut(
+            Stream.fromQueueUnterminated(bspOutQ),
+            openRequests,
+            exitSwitch
+          ),
+          processBspErr(Stream.fromQueueUnterminated(bspErrQ))
+        ).map(_.left.get)
       )
       out <- IO.race(bspServer, result)
     yield out.right.get
@@ -232,9 +236,23 @@ case class LspTestProcess(workspaceRoot: Path):
       d2 <- client.buildInitialized(())
       _ <- d2.get
     yield resp
- 
+
+  private def shutdown(
+      client: BspClient,
+      exitSwitch: Deferred[IO, Either[Throwable, Unit]]
+  ): IO[Unit] =
+    for
+      d1 <- client.buildShutdown(())
+      resp <- d1.get
+      // d2 <- client.buildExit(())
+      // _ <- d2.get
+      _ <- exitSwitch.complete(Right(()))
+    yield ()
+
   extension [A](io: IO[A])
-    def marker(str: String) = io.map { a => System.err.println(str + s" WITH: $a");  a }
+    def marker(str: String) = io.map { a =>
+      System.err.println(str + s" WITH: $a"); a
+    }
 
   private def compile(
       client: BspClient,
@@ -254,17 +272,17 @@ case class LspTestProcess(workspaceRoot: Path):
 case class Lsp(actions: Vector[Lsp.Action]):
 
   def :+(a: Lsp.Action): Lsp = copy(actions :+ a)
-  def start: Lsp = 
+  def start: Lsp =
     this :+ Lsp.Action.Start
 
   def compile(target: String): Lsp =
-    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target)) 
+    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target))
 
-  def runFor(
-      workspaceRoot: Path,
-      duration: FiniteDuration
-  ): IO[(List[Matchable], List[Notification])] =
-    LspTestProcess(workspaceRoot).runFor(actions.toList, duration)
+  def shutdown: Lsp =
+    this :+ Lsp.Action.Shutdown
+
+  def runIn(workspaceRoot: Path): IO[(List[Matchable], List[Notification])] =
+    LspTestProcess(workspaceRoot).runIn(actions.toList)
 
 object Lsp:
 
@@ -273,4 +291,5 @@ object Lsp:
   sealed trait Action
   object Action:
     case object Start extends Action
+    case object Shutdown extends Action
     case class Compile(target: BuildTargetIdentifier) extends Action

@@ -20,8 +20,8 @@ object BspClient:
     BspClientImpl(outQ, logger)
 
   private class BspClientImpl(outQ: Queue[IO, Message], logger: Logger)
-    extends BspClient
-    with JRpcClient:
+      extends BspClient
+      with JRpcClient:
 
     def sendNotification(n: Notification): IO[Unit] =
       for

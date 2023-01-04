@@ -44,7 +44,8 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
     .test("should successfully initialize") { (root, bazel) =>
 
       val (responses, notifications) = Lsp.start
-        .runFor(root, 30.seconds)
+        .shutdown
+        .runIn(root)
         .unsafeRunSync()
 
       assertEquals(notifications, Nil)
@@ -70,7 +71,8 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
       val (_, notifications) = Lsp.start
         .compile("//...")
-        .runFor(root, 30.seconds)
+        .shutdown
+        .runIn(root)
         .unsafeRunSync()
 
       assertEquals(notifications.length, 2)
@@ -95,7 +97,8 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
       val (_, notifications) = Lsp.start
         .compile("//...")
-        .runFor(root, 30.seconds)
+        .shutdown
+        .runIn(root)
         .unsafeRunSync()
 
       assertEquals(notifications.length, 6)
