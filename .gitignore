@@ -3,3 +3,5 @@
 .vscode
 target/
 examples/**/bazel-*
+project/**/metals.sbt
+.bsp/sbt.json
