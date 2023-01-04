@@ -90,6 +90,7 @@ case class BspClient(
   def buildShutdown(params: Unit): IO[DeferredSource[IO, Unit]] =
     sendRequest("build/shutdown", params)
 
+  // TODO: Need to turn this into a notification, not a request
   // def buildExit(params: Unit): IO[Unit] =
   //   sendRequest("build/exit", params)
 
@@ -242,16 +243,12 @@ case class LspTestProcess(workspaceRoot: Path):
   ): IO[Unit] =
     for
       d1 <- client.buildShutdown(())
-      resp <- d1.get
+      _ <- d1.get
+      // TODO need to send exit, once that's supported
       // d2 <- client.buildExit(())
       // _ <- d2.get
       _ <- exitSwitch.complete(Right(()))
     yield ()
-
-  extension [A](io: IO[A])
-    def marker(str: String) = io.map { a =>
-      System.err.println(str + s" WITH: $a"); a
-    }
 
   private def compile(
       client: BspClient,
