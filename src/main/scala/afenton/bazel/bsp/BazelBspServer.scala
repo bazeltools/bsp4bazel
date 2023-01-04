@@ -245,7 +245,6 @@ class BazelBspServer(
   def buildShutdown(params: Unit): IO[Unit] =
     for
       _ <- logger.info("build/shutdown")
-      _ <- IO.raiseError(new Exception("SHUTTING DOWN"))
     yield ()
 
   def buildExit(params: Unit): IO[Unit] =
