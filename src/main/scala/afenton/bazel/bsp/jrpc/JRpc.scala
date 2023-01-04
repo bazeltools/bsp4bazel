@@ -190,11 +190,13 @@ def messageDispatcher(
     }
 
 case class RpcFunction[A: Decoder, B: Encoder](fn: A => IO[B]):
-  def decode(params: Json): A = Decoder[A].decodeJson(params).toTry.get
+  def decode(params: Json): IO[A] = IO.fromEither(Decoder[A].decodeJson(params))
   def encode(response: B): Json = Encoder[B].apply(response)
   def apply(json: Json): IO[Json] =
-    val params = decode(json)
-    fn(params).map(resp => encode(resp))
+    for
+      a <- decode(json)
+      b <- fn(a)
+    yield encode(b)
 
 object JRpcConsoleCodec {
 

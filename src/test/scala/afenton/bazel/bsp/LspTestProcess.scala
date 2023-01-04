@@ -183,12 +183,11 @@ case class LspTestProcess(workspaceRoot: Path):
       actions: List[Lsp.Action],
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[Matchable]] =
-    for results <- actions.map {
+    actions.traverse {
         case Action.Start           => start(client)
         case Action.Shutdown        => shutdown(client, exitSwitch)
         case Action.Compile(target) => compile(client, target)
-      }.sequence
-    yield results
+      }
 
   def runIn(
       actions: List[Lsp.Action]
@@ -272,6 +271,7 @@ case class LspTestProcess(workspaceRoot: Path):
 case class Lsp(actions: Vector[Lsp.Action]):
 
   def :+(a: Lsp.Action): Lsp = copy(actions :+ a)
+
   def start: Lsp =
     this :+ Lsp.Action.Start
 
