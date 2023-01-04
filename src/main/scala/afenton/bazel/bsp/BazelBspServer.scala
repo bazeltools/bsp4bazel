@@ -59,10 +59,12 @@ class BazelBspServer(
     for
       _ <- logger.info("build/initialized")
       state <- stateRef.get
+      root <- IOLifts.fromOption(state.workspaceRoot, s"missing workspaceRoot: $state")
+      runner <- IOLifts.fromOption(state.bazelRunner, s"missing bazelRunner: $state")
       ws <- workspaceBuildTargets(())
       ts <- doBuildTargetSources(
-        state.workspaceRoot.get,
-        state.bazelRunner.get,
+        root,
+        runner,
         ws.targets.map(_.id)
       )
       _ <- stateRef.update(s => s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts)))
@@ -72,13 +74,13 @@ class BazelBspServer(
       params: InverseSourcesParams
   ): IO[InverseSourcesResult] =
     for
-      state <- stateRef.get
       _ <- logger.info("buildTarget/inverseSources")
       state <- stateRef.get
+      root <- IOLifts.fromOption(state.workspaceRoot, s"missing workspaceRoot in $state")
     yield
       val relativeUri =
         UriFactory.fileUri(
-          state.workspaceRoot.get.relativize(Paths.get(params.textDocument.uri))
+          root.relativize(Paths.get(params.textDocument.uri))
         )
 
       InverseSourcesResult(
@@ -116,9 +118,11 @@ class BazelBspServer(
     for
       _ <- logger.info("workspace/buildTargets")
       state <- stateRef.get
-      bspTargets <- state.bazelRunner.get.bspTargets
+      runner <- IOLifts.fromOption(state.bazelRunner, s"missing bazelRunner: $state")
+      root <- IOLifts.fromOption(state.workspaceRoot, s"missing workspaceRoot in $state")
+      bspTargets <- runner.bspTargets
     yield WorkspaceBuildTargetsResult(
-      bspTargets.map(t => buildTarget(t, state.workspaceRoot.get))
+      bspTargets.map(t => buildTarget(t, root))
     )
 
   def buildTargetScalacOptions(
@@ -165,12 +169,12 @@ class BazelBspServer(
             yield ()
           }
           .evalTap { fd =>
-            val pd = PublishDiagnosticsParams.fromScalacDiagnostic(
+            IOLifts.fromOption(PublishDiagnosticsParams.fromScalacDiagnostic(
               workspaceRoot,
               target,
               fd
-            )
-            client.publishDiagnostics(pd)
+            ), s"missing range in $fd")
+              .flatMap(client.publishDiagnostics(_))
           }
           .compile
           .toList
@@ -185,13 +189,16 @@ class BazelBspServer(
   ): IO[Unit] =
     for
       state <- stateRef.get
+      root <- IOLifts.fromOption(state.workspaceRoot, s"missing workspaceRoot in $state")
       pathSet = fds.map(fs => fs.path).toSet
-      clearDiagnostics = state.currentErrors
+      clearDiagnostics <- state.currentErrors
         .filterNot(fd => pathSet.contains(fd.path))
         .map(_.clearDiagnostics)
-        .map(fd =>
-          PublishDiagnosticsParams
-            .fromScalacDiagnostic(state.workspaceRoot.get, target, fd)
+        .traverse(fd =>
+          IOLifts.fromOption(
+            PublishDiagnosticsParams
+              .fromScalacDiagnostic(root, target, fd),
+              s"could not convert $fd to PublishDiagosticsParams")
         )
       _ <- clearDiagnostics.map(client.publishDiagnostics).sequence_
       _ <- stateRef.update(_.copy(currentErrors = fds))
@@ -199,7 +206,6 @@ class BazelBspServer(
 
   private def compileTarget(target: BuildTargetIdentifier): IO[Unit] =
     for
-      state <- stateRef.get
       id <- IO.randomUUID.map(u => TaskId(u.toString, None))
       start <- IO.realTimeInstant
       _ <- client.buildTaskStart(
@@ -211,7 +217,10 @@ class BazelBspServer(
           Some(CompileTask(target).asJson)
         )
       )
-      fds <- doCompile(state.workspaceRoot.get, state.bazelRunner.get, target, id)
+      state <- stateRef.get
+      runner <- IOLifts.fromOption(state.bazelRunner, s"missing bazelRunner: $state")
+      root <- IOLifts.fromOption(state.workspaceRoot, s"missing workspaceRoot in $state")
+      fds <- doCompile(root, runner, target, id)
       _ <- clearPrevDiagnostics(target, fds)
       end <- IO.realTimeInstant
       _ <- client.buildTaskFinished(
@@ -268,6 +277,7 @@ class BazelBspServer(
     for
       _ <- logger.info("buildTarget/sources")
       state <- stateRef.get
+      root <- IOLifts.fromOption(state.workspaceRoot, s"missing workspaceRoot in $state")
     yield
       val sourcesItem = params.targets.map { target =>
         val sources = state.targetSourceMap
@@ -276,7 +286,7 @@ class BazelBspServer(
         SourcesItem(
           target,
           sources,
-          Some(List(UriFactory.fileUri(state.workspaceRoot.get).toString))
+          Some(List(UriFactory.fileUri(root).toString))
         )
       }
       SourcesResult(sourcesItem)
