@@ -87,8 +87,12 @@ case class BspClient(
   def buildInitialized(params: Unit): IO[DeferredSource[IO, Unit]] =
     sendRequest("build/initialized", params)
 
-  // def buildShutdown(params: Unit): IO[Unit]
-  // def buildExit(params: Unit): IO[Unit]
+  def buildShutdown(params: Unit): IO[DeferredSource[IO, Unit]] =
+    sendRequest("build/shutdown", params)
+
+  // TODO: Need to turn this into a notification, not a request
+  // def buildExit(params: Unit): IO[Unit] =
+  //   sendRequest("build/exit", params)
 
   // def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult]
 
@@ -140,18 +144,29 @@ case class LspTestProcess(workspaceRoot: Path):
 
   private val logger: Logger = Logger.noOp
 
+  private def checkOutputType: Pipe[IO, Message, Response | Notification] = {
+    (stream: Stream[IO, Message]) =>
+      stream
+        .evalMap {
+          case n: Notification => IO.pure(n)
+          case resp: Response => IO.pure(resp) 
+          case req: Request => IO.raiseError(new Exception(s"Didn't expect to get a request here. Got $req"))
+        }
+  }
+
   private def processBspOut(
       outStream: Stream[IO, String],
       openRequestsRef: Ref[IO, OpenRequests],
-      duration: FiniteDuration
+      exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[Notification]] =
     outStream
       .through(jRpcParser(logger))
+      .through(checkOutputType)
       .evalFilter {
         case resp @ Response(jsonrpc, id, result, error) =>
           for
             or <- openRequestsRef.get
-            deferred = or.get(id.get.toString).get
+            deferred <- IOLifts.fromOption(or.get(id.get.toString))
             result <- deferred
               .complete(resp)
               .ifM(
@@ -160,37 +175,32 @@ case class LspTestProcess(workspaceRoot: Path):
               )
           yield false
 
-        case n: Notification => IO.pure(true)
-
-        case _ => IO.raiseError(new Exception("Shouldn't get here"))
+        case _: Notification => IO.pure(true)
       }
+      .interruptWhen(exitSwitch)
       .collect { case n: Notification => n }
-      .interruptAfter(duration)
       .compile
       .toList
 
-  private def processBspErr(
-      errStream: Stream[IO, String],
-      duration: FiniteDuration
-  ): IO[Unit] =
+  private def processBspErr(errStream: Stream[IO, String]): IO[Unit] =
     errStream
       .evalMap(str => Console[IO].errorln(str))
-      .interruptAfter(duration)
       .compile
       .drain
 
   private def processActions(
       client: BspClient,
-      actions: List[Lsp.Action]
+      actions: List[Lsp.Action],
+      exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[Matchable]] =
     actions.traverse {
       case Action.Start           => start(client)
+      case Action.Shutdown        => shutdown(client, exitSwitch)
       case Action.Compile(target) => compile(client, target)
     }
 
-  def runFor(
-      actions: List[Lsp.Action],
-      duration: FiniteDuration
+  def runIn(
+      actions: List[Lsp.Action]
   ): IO[(List[Matchable], List[Notification])] =
     for
       bspOutQ <- Queue.bounded[IO, String](1_000)
@@ -204,16 +214,24 @@ case class LspTestProcess(workspaceRoot: Path):
       openRequests <- Ref.of[IO, OpenRequests](Map.empty)
       counter <- Ref.of[IO, Int](1)
       client = BspClient(openRequests, bspInQ, counter)
-      result = IO.both(
-        processActions(client, actions),
-        (processBspOut(
-          Stream.fromQueueUnterminated(bspOutQ),
-          openRequests,
-          duration
-        ) <& processBspErr(Stream.fromQueueUnterminated(bspErrQ), duration))
-      )
-      out <- IO.race(bspServer, result)
-    yield out.right.get
+      exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
+
+      fibOut <- processBspOut(
+        Stream.fromQueueUnterminated(bspOutQ),
+        openRequests,
+        exitSwitch
+      ).start
+      fibErr <- processBspErr(Stream.fromQueueUnterminated(bspErrQ)).start
+      fibServer <- bspServer.start
+
+      resp <- processActions(client, actions, exitSwitch)
+
+      notifications <- fibOut.joinWith(IO.raiseError(new Exception("Unexpected cancelation")))
+      _ <- fibErr.cancel
+      _ <- fibServer.cancel
+
+    yield 
+      (resp, notifications)
 
   private def start(client: BspClient): IO[InitializeBuildResult] =
     for
@@ -232,8 +250,18 @@ case class LspTestProcess(workspaceRoot: Path):
       _ <- d2.get
     yield resp
 
-  extension [A](io: IO[A])
-    def marker(str: String) = io.map { a => System.err.println(str + s" WITH: $a");  a }
+  private def shutdown(
+      client: BspClient,
+      exitSwitch: Deferred[IO, Either[Throwable, Unit]]
+  ): IO[Unit] =
+    for
+      d1 <- client.buildShutdown(())
+      _ <- d1.get
+      // TODO need to send exit, once that's supported
+      // d2 <- client.buildExit(())
+      // _ <- d2.get
+      _ <- exitSwitch.complete(Right(()))
+    yield ()
 
   private def compile(
       client: BspClient,
@@ -253,17 +281,18 @@ case class LspTestProcess(workspaceRoot: Path):
 case class Lsp(actions: Vector[Lsp.Action]):
 
   def :+(a: Lsp.Action): Lsp = copy(actions :+ a)
+
   def start: Lsp =
     this :+ Lsp.Action.Start
 
   def compile(target: String): Lsp =
     this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target))
 
-  def runFor(
-      workspaceRoot: Path,
-      duration: FiniteDuration
-  ): IO[(List[Matchable], List[Notification])] =
-    LspTestProcess(workspaceRoot).runFor(actions.toList, duration)
+  def shutdown: Lsp =
+    this :+ Lsp.Action.Shutdown
+
+  def runIn(workspaceRoot: Path): IO[(List[Matchable], List[Notification])] =
+    LspTestProcess(workspaceRoot).runIn(actions.toList)
 
 object Lsp:
 
@@ -272,4 +301,5 @@ object Lsp:
   sealed trait Action
   object Action:
     case object Start extends Action
+    case object Shutdown extends Action
     case class Compile(target: BuildTargetIdentifier) extends Action
