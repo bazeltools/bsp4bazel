@@ -8,9 +8,15 @@ object IOLifts {
    * returns a NoSuchElementException, the same as None.get
    */
   final inline def fromOption[A](inline opt: Option[A]): IO[A] =
-    ${fromOptionImpl('opt)}
+    ${fromOptionImpl[A, A]('opt, '{a => IO.pure[A](a)})}
 
-  def fromOptionImpl[A: Type](expr: Expr[Option[A]])(using ctx: Quotes): Expr[IO[A]] = {
+  extension [A](inline option: Option[A]) {
+    inline def asIO: IO[A] = fromOption(option)
+    inline def mapToIO[B](inline fn: A => IO[B]): IO[B] =
+      ${fromOptionImpl('option, 'fn)}
+  }
+
+  def fromOptionImpl[A: Type, B: Type](expr: Expr[Option[A]], fn: Expr[A => IO[B]])(using ctx: Quotes): Expr[IO[B]] = {
     val rootPosition = ctx.reflect.Position.ofMacroExpansion
     val file = Expr(rootPosition.sourceFile.path)
     val line = Expr((rootPosition.startLine + 1).toString)
@@ -24,23 +30,23 @@ object IOLifts {
       str.append(${file})
       str.append(" at line: ")
       str.append(${line})
-      IO.raiseError[A](new java.util.NoSuchElementException(str.toString()))
+      IO.raiseError[B](new java.util.NoSuchElementException(str.toString()))
     }
 
     expr match {
-      case '{Some[A]($a)} => '{IO.pure[A](${a})}
+      case '{Some[A]($a)} => Expr.betaReduce('{$fn(${a})})
       case '{None} => errorCase
       case _ =>
         '{
           val res = $expr
-          if (res.isDefined) then IO.pure[A](res.get)
-          else ${errorCase}
+          if (res.isDefined) then ${Expr.betaReduce('{$fn(res.get)})}
+          else $errorCase
         }
       }
   }
 
   /*
-  useful for debugging at the repl
+  //useful for debugging at the repl
 
   inline def show[A](inline a: A): A =
     ${showImpl('a)}

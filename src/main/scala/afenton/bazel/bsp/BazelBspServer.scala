@@ -20,6 +20,8 @@ import java.net.URI
 import java.nio.file.Path
 import java.nio.file.Paths
 
+import IOLifts.{asIO, mapToIO}
+
 class BazelBspServer(
     client: BspClient,
     logger: Logger,
@@ -59,14 +61,15 @@ class BazelBspServer(
     for
       _ <- logger.info("build/initialized")
       state <- stateRef.get
-      root <- IOLifts.fromOption(state.workspaceRoot)
-      runner <- IOLifts.fromOption(state.bazelRunner)
+      root <- state.workspaceRoot.asIO
       ws <- workspaceBuildTargets(())
-      ts <- doBuildTargetSources(
-        root,
-        runner,
-        ws.targets.map(_.id)
-      )
+      ts <- state.bazelRunner.mapToIO { runner =>
+        doBuildTargetSources(
+          root,
+          runner,
+          ws.targets.map(_.id)
+        )
+      }
       _ <- stateRef.update(s => s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts)))
     yield ()
 
@@ -76,7 +79,7 @@ class BazelBspServer(
     for
       _ <- logger.info("buildTarget/inverseSources")
       state <- stateRef.get
-      root <- IOLifts.fromOption(state.workspaceRoot)
+      root <- state.workspaceRoot.asIO
     yield
       val relativeUri =
         UriFactory.fileUri(
@@ -118,8 +121,8 @@ class BazelBspServer(
     for
       _ <- logger.info("workspace/buildTargets")
       state <- stateRef.get
-      runner <- IOLifts.fromOption(state.bazelRunner)
-      root <- IOLifts.fromOption(state.workspaceRoot)
+      runner <- state.bazelRunner.asIO
+      root <- state.workspaceRoot.asIO
       bspTargets <- runner.bspTargets
     yield WorkspaceBuildTargetsResult(
       bspTargets.map(t => buildTarget(t, root))
@@ -169,12 +172,11 @@ class BazelBspServer(
             yield ()
           }
           .evalTap { fd =>
-            IOLifts.fromOption(PublishDiagnosticsParams.fromScalacDiagnostic(
+            PublishDiagnosticsParams.fromScalacDiagnostic(
               workspaceRoot,
               target,
               fd
-            ))
-              .flatMap(client.publishDiagnostics(_))
+            ).mapToIO(client.publishDiagnostics(_))
           }
           .compile
           .toList
@@ -189,16 +191,15 @@ class BazelBspServer(
   ): IO[Unit] =
     for
       state <- stateRef.get
-      root <- IOLifts.fromOption(state.workspaceRoot)
+      root <- state.workspaceRoot.asIO
       pathSet = fds.map(fs => fs.path).toSet
       clearDiagnostics <- state.currentErrors
         .filterNot(fd => pathSet.contains(fd.path))
         .map(_.clearDiagnostics)
-        .traverse(fd =>
-          IOLifts.fromOption(
-            PublishDiagnosticsParams
-              .fromScalacDiagnostic(root, target, fd))
-        )
+        .traverse { fd =>
+          PublishDiagnosticsParams
+            .fromScalacDiagnostic(root, target, fd).asIO
+        }
       _ <- clearDiagnostics.traverse_(client.publishDiagnostics)
       _ <- stateRef.update(_.copy(currentErrors = fds))
     yield ()
@@ -217,9 +218,10 @@ class BazelBspServer(
         )
       )
       state <- stateRef.get
-      runner <- IOLifts.fromOption(state.bazelRunner)
-      root <- IOLifts.fromOption(state.workspaceRoot)
-      fds <- doCompile(root, runner, target, id)
+      runner <- state.bazelRunner.asIO
+      fds <- state.workspaceRoot.mapToIO { root =>
+        doCompile(root, runner, target, id)
+      }
       _ <- clearPrevDiagnostics(target, fds)
       end <- IO.realTimeInstant
       _ <- client.buildTaskFinished(
@@ -274,7 +276,7 @@ class BazelBspServer(
     for
       _ <- logger.info("buildTarget/sources")
       state <- stateRef.get
-      root <- IOLifts.fromOption(state.workspaceRoot)
+      root <- state.workspaceRoot.asIO
     yield
       val sourcesItem = params.targets.map { target =>
         val sources = state.targetSourceMap

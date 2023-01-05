@@ -35,6 +35,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration.FiniteDuration
 
+import afenton.bazel.bsp.IOLifts.{asIO, mapToIO}
+
 type OpenRequests = Map[String, Deferred[IO, Response]]
 
 /** A cient interface to the BSP server.
@@ -45,7 +47,7 @@ case class BspClient(
     counter: Ref[IO, Int]
 ):
 
-  private def sendRequest[A: Encoder, B: Encoder: Decoder](
+  private def sendRequest[A: Encoder, B: Decoder](
       method: String,
       params: A
   )(using ev: BspClient.IsUnit[B]): IO[DeferredSource[IO, B]] =
@@ -163,11 +165,13 @@ case class LspTestProcess(workspaceRoot: Path):
       .through(jRpcParser(logger))
       .through(checkOutputType)
       .evalFilter {
-        case resp @ Response(jsonrpc, id, result, error) =>
+        case resp @ Response(_, id, _, _) =>
           for
             or <- openRequestsRef.get
-            deferred <- IOLifts.fromOption(or.get(id.get.toString))
-            result <- deferred
+            deferred <- id.mapToIO { idRes =>
+              or.get(idRes.toString).asIO
+            }
+            _ <- deferred
               .complete(resp)
               .ifM(
                 IO.unit,
