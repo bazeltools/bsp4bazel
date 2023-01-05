@@ -192,7 +192,7 @@ case class LspTestProcess(workspaceRoot: Path):
       client: BspClient,
       actions: List[Lsp.Action],
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
-  ): IO[List[Matchable]] =
+  ): IO[List[InitializeBuildResult | Unit]] =
     actions.traverse {
       case Action.Start           => start(client)
       case Action.Shutdown        => shutdown(client, exitSwitch)
@@ -201,7 +201,7 @@ case class LspTestProcess(workspaceRoot: Path):
 
   def runIn(
       actions: List[Lsp.Action]
-  ): IO[(List[Matchable], List[Notification])] =
+  ): IO[(List[InitializeBuildResult | Unit], List[Notification])] =
     for
       bspOutQ <- Queue.bounded[IO, String](1_000)
       bspErrQ <- Queue.bounded[IO, String](1_000)
@@ -291,7 +291,7 @@ case class Lsp(actions: Vector[Lsp.Action]):
   def shutdown: Lsp =
     this :+ Lsp.Action.Shutdown
 
-  def runIn(workspaceRoot: Path): IO[(List[Matchable], List[Notification])] =
+  def runIn(workspaceRoot: Path): IO[(List[InitializeBuildResult | Unit], List[Notification])] =
     LspTestProcess(workspaceRoot).runIn(actions.toList)
 
 object Lsp:
