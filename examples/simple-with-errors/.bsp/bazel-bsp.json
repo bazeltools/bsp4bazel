@@ -7,6 +7,7 @@
         "scala"
     ],
     "argv": [
-        "bazel-bsp"
+        "../../target/universal/stage/bin/bazel-bsp",
+        "--verbose"
     ]
 }

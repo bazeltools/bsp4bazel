@@ -19,11 +19,13 @@ import io.circe.syntax._
 import java.net.URI
 import java.nio.file.Path
 import java.nio.file.Paths
+import cats.effect.kernel.Deferred
 
 class BazelBspServer(
     client: BspClient,
     logger: Logger,
-    stateRef: Ref[IO, BazelBspServer.ServerState]
+    stateRef: Ref[IO, BazelBspServer.ServerState],
+    val exitSignal: Deferred[IO, Either[Throwable, Unit]]
 ) extends BspServer(client):
 
   def buildInitialize(
@@ -245,12 +247,12 @@ class BazelBspServer(
   def buildShutdown(params: Unit): IO[Unit] =
     for
       _ <- logger.info("build/shutdown")
+      _ <- exitSignal.complete(Right(()))
     yield ()
 
   def buildExit(params: Unit): IO[Unit] =
     for
       _ <- logger.info("build/exit")
-      _ <- IO.canceled
     yield ()
 
   private def doBuildTargetSources(
@@ -328,10 +330,11 @@ object BazelBspServer:
     ServerState(BazelBspServer.TargetSourceMap.empty, Nil, None, None, Nil)
 
   def create(client: BspClient, logger: Logger): IO[BazelBspServer] =
-    Ref.of[IO, BazelBspServer.ServerState](defaultState)
-      .map { stateRef =>
-        BazelBspServer(client, logger, stateRef)
-      }
+    for 
+      exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
+      stateRef <- Ref.of[IO, BazelBspServer.ServerState](defaultState)
+    yield
+      BazelBspServer(client, logger, stateRef, exitSwitch)
 
   protected case class TargetSourceMap(
       val _targetSources: Map[BuildTargetIdentifier, List[

@@ -24,6 +24,7 @@ import fs2.text
 import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
 import io.circe.Json
 import io.circe.syntax.*
+import cats.effect.std.Console
 
 import java.net.ServerSocket
 import java.nio.file.Path
@@ -32,6 +33,7 @@ import cats.data.Nested
 import java.nio.file.StandardOpenOption
 import scala.concurrent.duration.FiniteDuration
 import java.util.concurrent.TimeUnit
+import cats.effect.kernel.Deferred
 
 object BazelBspApp
     extends CommandIOApp(
@@ -50,14 +52,14 @@ object BazelBspApp
           fs2.text.utf8.encode.andThen(fs2.io.stdout),
           fs2.text.utf8.encode.andThen(fs2.io.stderr)
         )
-        .handleErrorWith { e =>
-          IO.blocking {
-            System.err.println(
-              s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
-            )
-            ExitCode.Error
+          .handleErrorWith { e =>
+            IO.blocking {
+              System.err.println(
+                s"ERROR: 💣 💣 💣 \n${e.toString} \n${e.getStackTrace.mkString("\n")}"
+              )
+              ExitCode.Error
+            }
           }
-        }
       }
 
   val verifySetupOpt =
@@ -87,11 +89,11 @@ object BazelBspApp
   def printVerifyResult(
       result: List[(String, Either[String, Unit])]
   ): IO[Unit] =
-      result
-        .traverse_ {
-          case (n, Right(_))  => IO.println(s"✅ $n")
-          case (n, Left(err)) => IO.println(s"❌ $n\n   $err\n")
-        }
+    result
+      .traverse_ {
+        case (n, Right(_))  => IO.println(s"✅ $n")
+        case (n, Left(err)) => IO.println(s"❌ $n\n   $err\n")
+      }
 
   def main: Opts[IO[ExitCode]] =
     verboseOpt
@@ -140,14 +142,13 @@ object BazelBspApp
       logger: Logger
   ): Stream[IO, Unit] =
     inStream
-      // .evalTap(s => logger.trace(s))
       .through(jRpcParser(logger))
       .evalTap(request => logger.trace(s"request: ${request}"))
       .through(messageDispatcher(BspServer.jsonRpcRouter(bspServer)))
       .evalTap(response => logger.trace(s"response: ${response}"))
       .evalMap {
         case resp: Response => outQ.offer(resp)
-        case u: Unit => IO.unit
+        case u: Unit        => IO.unit
       }
 
   private def processOutStream(
@@ -158,7 +159,6 @@ object BazelBspApp
     Stream
       .fromQueueUnterminated(outQ, 100)
       .map(msg => JRpcConsoleCodec.encode(msg, false))
-      // .evalTap(msg => logger.trace(msg))
       .through(outPipe)
 
   def server(verbose: Boolean)(
@@ -177,5 +177,7 @@ object BazelBspApp
         processOutStream(outPipe, outQ, logger),
         logStream
       ).parJoin(3)
+        .interruptWhen(server.exitSignal)
+        .onFinalize(Console[IO].errorln("👋 BSP Server Shutting Down"))
       _ <- all.compile.drain
     yield ExitCode.Success
