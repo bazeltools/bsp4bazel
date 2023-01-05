@@ -26,7 +26,7 @@ trait BspHelpers:
   self: munit.FunSuite =>
 
   extension [A](ls: List[A])
-    def select[AA: Typeable]: AA =
+    def select[AA <: A: Typeable]: AA =
       ls.collectFirst { case t: AA => t } match
         case None        => fail("Expected to find type T, but didn't")
         case Some(value) => value
