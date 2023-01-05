@@ -177,6 +177,7 @@ object BazelBspApp
         processOutStream(outPipe, outQ, logger),
         logStream
       ).parJoin(3)
+        // NB: Allow time for response to get through
         .interruptWhen(server.exitSignal)
         .onFinalize(Console[IO].errorln("👋 BSP Server Shutting Down"))
       _ <- all.compile.drain

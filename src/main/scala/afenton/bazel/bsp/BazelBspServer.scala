@@ -249,12 +249,12 @@ class BazelBspServer(
   def buildShutdown(params: Unit): IO[Unit] =
     for
       _ <- logger.info("build/shutdown")
-      _ <- exitSignal.complete(Right(()))
     yield ()
 
   def buildExit(params: Unit): IO[Unit] =
     for
       _ <- logger.info("build/exit")
+      _ <- exitSignal.complete(Right(()))
     yield ()
 
   private def doBuildTargetSources(

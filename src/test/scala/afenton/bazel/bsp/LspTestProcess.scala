@@ -46,6 +46,16 @@ case class BspClient(
     bspInQ: Queue[IO, String],
     counter: Ref[IO, Int]
 ):
+  private def sendNotfication[A: Encoder](
+      method: String,
+      params: A
+  ): IO[Unit] =
+    val notification = Notification("2.0", method, Some(Encoder[A].apply(params)))
+    Stream
+      .emit(JRpcConsoleCodec.encode(notification, false))
+      .evalMap(s => bspInQ.offer(s))
+      .compile
+      .drain
 
   private def sendRequest[A: Encoder, B: Decoder](
       method: String,
@@ -92,9 +102,8 @@ case class BspClient(
   def buildShutdown(params: Unit): IO[DeferredSource[IO, Unit]] =
     sendRequest("build/shutdown", params)
 
-  // TODO: Need to turn this into a notification, not a request
-  // def buildExit(params: Unit): IO[Unit] =
-  //   sendRequest("build/exit", params)
+  def buildExit(params: Unit): IO[Unit] =
+    sendNotfication("build/exit", params)
 
   // def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult]
 
@@ -261,9 +270,7 @@ case class LspTestProcess(workspaceRoot: Path):
     for
       d1 <- client.buildShutdown(())
       _ <- d1.get
-      // TODO need to send exit, once that's supported
-      // d2 <- client.buildExit(())
-      // _ <- d2.get
+      _ <- client.buildExit(())
       _ <- exitSwitch.complete(Right(()))
     yield ()
 
