@@ -2,6 +2,8 @@ package afenton.bazel.bsp
 
 import cats.effect.IO
 import scala.quoted.*
+import java.nio.file.Paths
+import scala.util.control.NonFatal
 
 object IOLifts {
   /** Convert an Option to an IO or make a good error message
@@ -18,19 +20,17 @@ object IOLifts {
 
   def fromOptionImpl[A: Type, B: Type](expr: Expr[Option[A]], fn: Expr[A => IO[B]])(using ctx: Quotes): Expr[IO[B]] = {
     val rootPosition = ctx.reflect.Position.ofMacroExpansion
-    val file = Expr(rootPosition.sourceFile.path)
-    val line = Expr((rootPosition.startLine + 1).toString)
-    val show = Expr(expr.show)
+    val absFile: String = rootPosition.sourceFile.path
+    val file = try {
+      Paths.get("").toAbsolutePath.relativize(Paths.get(absFile)).toString
+    } catch {
+      case NonFatal(_) => absFile
+    }
+    val line = rootPosition.startLine + 1
+    val msg = Expr(s"expected ${expr.show} to be defined in file: $file at line: $line")
 
     val errorCase = '{
-      val str = new StringBuilder
-      str.append("expected ")
-      str.append(${show})
-      str.append(" to be defined in file: ")
-      str.append(${file})
-      str.append(" at line: ")
-      str.append(${line})
-      IO.raiseError[B](new java.util.NoSuchElementException(str.toString()))
+      IO.raiseError[B](new java.util.NoSuchElementException($msg))
     }
 
     expr match {
