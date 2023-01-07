@@ -55,8 +55,8 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         responses.select[InitializeBuildResult],
         InitializeBuildResult(
           "Bazel",
-          BuildMetaData.Version,
-          BuildMetaData.BspVersion,
+          BuildInfo.version,
+          BuildInfo.bspVersion,
           BuildServerCapabilities(
             compileProvider = Some(CompileProvider(List("scala"))),
             inverseSourcesProvider = Some(true),

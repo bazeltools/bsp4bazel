@@ -39,7 +39,7 @@ object BazelBspApp
     extends CommandIOApp(
       name = "bazel-bsp",
       header = "Bazel BSP server",
-      version = BuildMetaData.Version
+      version = BuildInfo.version
     ):
 
   val verboseOpt =
@@ -124,8 +124,8 @@ object BazelBspApp
   private lazy val bspConfig: String = s"""
 {
     "name": "BazelBsp",
-    "version": "${BuildMetaData.Version}",
-    "bspVersion": "${BuildMetaData.BspVersion}",
+    "version": "${BuildInfo.version}",
+    "bspVersion": "${BuildInfo.bspVersion}",
     "languages": [
         "scala"
     ],
