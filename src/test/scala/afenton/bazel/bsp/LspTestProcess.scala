@@ -46,16 +46,12 @@ case class BspClient(
     bspInQ: Queue[IO, String],
     counter: Ref[IO, Int]
 ):
-  private def sendNotfication[A: Encoder](
+  private def sendNotification[A: Encoder](
       method: String,
       params: A
   ): IO[Unit] =
     val notification = Notification("2.0", method, Some(Encoder[A].apply(params)))
-    Stream
-      .emit(JRpcConsoleCodec.encode(notification, false))
-      .evalMap(s => bspInQ.offer(s))
-      .compile
-      .drain
+    bspInQ.offer(JRpcConsoleCodec.encode(notification, false))
 
   private def sendRequest[A: Encoder, B: Decoder](
       method: String,
@@ -103,7 +99,7 @@ case class BspClient(
     sendRequest("build/shutdown", params)
 
   def buildExit(params: Unit): IO[Unit] =
-    sendNotfication("build/exit", params)
+    sendNotification("build/exit", params)
 
   // def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult]
 
