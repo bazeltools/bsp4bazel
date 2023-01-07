@@ -36,7 +36,7 @@ jobs:
         run: |
           sbt graalvm-native-image:packageBin
       - name: Prepare output
-        run: /.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
+        run: ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
