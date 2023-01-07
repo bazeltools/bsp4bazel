@@ -14,17 +14,14 @@ jobs:
   make-binaries:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-20.04, ubuntu-18.04]
+        os: [macos-latest, ubuntu-20.04]
         include:
           - os: macos-latest
             platform: macos-x86
             artifact: bazel-bsp-macos-x86
           - os: ubuntu-20.04
             platform: linux-ubuntu-20.04
-            artifact: bazel-bsp-linux-ubuntu-20.04
-          - os: ubuntu-18.04
-            platform: linux-ubuntu-18.04
-            artifact: bazel-bsp-linux-ubuntu-18.04
+            artifact: bazel-bsp-linux-x86
     name: Make binaries for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -38,13 +35,13 @@ jobs:
       - name: Run native image
         run: |
           sbt graalvm-native-image:packageBin
-      - name: Rename output
-        run: mv target/graalvm-native-image/bazel-bsp ${{ matrix.artifact }} 
+      - name: Prepare output
+        run: ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
+          path: staging-directory
   make_release:
     name: Make release
     needs: [make-binaries]
@@ -53,12 +50,7 @@ jobs:
       - name: Download linux 20.04
         uses: actions/download-artifact@v1
         with:
-          name: bazel-bsp-linux-ubuntu-20.04
-          path: downloads
-      - name: Download linux 18.04
-        uses: actions/download-artifact@v1
-        with:
-          name: bazel-bsp-linux-ubuntu-18.04
+          name: bazel-bsp-linux-x86
           path: downloads
       - name: Download macos x86
         uses: actions/download-artifact@v1
@@ -71,6 +63,7 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
           files: |
-            downloads/bazel-bsp-linux-ubuntu-20.04
-            downloads/bazel-bsp-linux-ubuntu-18.04
+            downloads/bazel-bsp-linux-x86
+            downloads/bazel-bsp-linux-x86.sha256
             downloads/bazel-bsp-macos-x86
+            downloads/bazel-bsp-macos-x86.sha256
