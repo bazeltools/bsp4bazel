@@ -2,13 +2,14 @@ val scala3Version = "3.2.1"
 
 // enablePlugins(JavaAppPackaging)
 enablePlugins(GraalVMNativeImagePlugin)
+enablePlugins(BuildInfoPlugin)
 
 lazy val root = project
   .in(file("."))
   .settings(
     name := "bazel-bsp",
     organization := "afenton",
-    version := "0.0.15",
+    version := "0.0.16",
     scalaVersion := scala3Version,
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.4.4",
     libraryDependencies += "co.fs2" %% "fs2-core" % "3.3.0",
@@ -32,5 +33,13 @@ lazy val root = project
     ),
     Compile / PB.targets := Seq(
       scalapb.gen() -> (Compile / sourceManaged).value / "scalapb"
-    )
+    ),
+    buildInfoKeys := Seq[BuildInfoKey](
+      name,
+      version,
+      scalaVersion,
+      sbtVersion,
+      "bspVersion" -> "2.0.0-M2"
+    ),
+    buildInfoPackage := "afenton.bazel.bsp"
   )

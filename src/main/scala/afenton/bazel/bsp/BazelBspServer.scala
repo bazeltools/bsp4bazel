@@ -48,8 +48,8 @@ class BazelBspServer(
 
         InitializeBuildResult(
           "Bazel",
-          BuildMetaData.Version,
-          BuildMetaData.BspVersion,
+          BuildInfo.version,
+          BuildInfo.bspVersion,
           BuildServerCapabilities(
             compileProvider = Some(compileProvider),
             inverseSourcesProvider = Some(true),
