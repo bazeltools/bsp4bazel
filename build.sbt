@@ -7,8 +7,8 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "bazel-bsp",
-    organization := "org.afenton",
-    version := "0.1.0-SNAPSHOT",
+    organization := "afenton",
+    version := "0.0.15",
     scalaVersion := scala3Version,
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.4.4",
     libraryDependencies += "co.fs2" %% "fs2-core" % "3.3.0",
