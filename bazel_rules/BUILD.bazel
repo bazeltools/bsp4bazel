@@ -1,0 +1,44 @@
+load("//private:load_tool.bzl", "load_tool")
+
+load_tool(
+    name = "bazel-bsp-linux-ubuntu-18.04",
+    urls = [
+        "https://github.com/psf/black/releases/download/22.3.0/black_macos",
+    ],
+    packaged = True,
+    binary_path = "bazel-bsp-linux-ubuntu-18.04",
+    sha256 = "ef787f80000f2612a2c7bbf86265b6fccff5cf3c463ea917879ca3e1cc9b0f80",
+)
+
+config_setting(
+    name = "macos_x86",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "macos_arm64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+config_setting(
+    name = "linux_x86",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+alias(
+    name = "bazel-bsp",
+    actual = select({
+        ":macos_x86": "@bazel-bsp-mac-x86//:bin",
+        ":linux_x86": "@bazel-bsp-linux-x86//:bin",
+    }),
+    visibility = ["//visibility:public"],
+)
