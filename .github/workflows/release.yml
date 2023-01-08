@@ -3,12 +3,15 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Automatic Release 
+name: Perform Release 
 
 on:
-  push:
-    tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The release version'
+        required: true 
+        type: string
 
 jobs:
   make-binaries:
@@ -26,6 +29,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
+      - name: Print version
+        run: echo Doing release for ${{ inputs.version }} 
       - uses: graalvm/setup-graalvm@v1
         with:
           version: 'latest'
@@ -47,6 +52,9 @@ jobs:
     needs: [make-binaries]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+        with:
+          path: "repo"
       - name: Download linux 20.04
         uses: actions/download-artifact@v1
         with:
@@ -57,6 +65,16 @@ jobs:
         with:
           name: bazel-bsp-macos-x86
           path: downloads
+      - name: Prepare release
+        run: ./.github/ci_scripts/prepare_release.sh 
+      - name: Commit changes
+        working-directory: "repo"
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "Release ${{ inputs.version }}"
+          git tag -a -m "Release ${{ inputs.version }}" ${{ inputs.version }}
+          git push --atomic --follow-tags
       - name: "Create release"
         uses: "marvinpinto/action-automatic-releases@latest"
         with:

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e
+TMPDIR="${TMPDIR:-/tmp}"
+
+if [ -z "$BAZEL_BIN_LOC" ]; then
+  BAZEL_BIN_LOC=~/.bazel_binaries
+fi
+
+mkdir -p "$BAZEL_BIN_LOC"
+
+if [ "$(uname -s)" == "Linux" ]; then
+  export BAZEL_LAUNCHER_PLATFORM_NAME='linux'
+elif [ "$(uname -s)" == "Darwin" ]; then
+  export BAZEL_LAUNCHER_PLATFORM_NAME='darwin'
+else
+  "Your platform $(uname -s) is unsupported, sorry"
+  exit 1
+fi
+
+BAZELISK_VERSION=v1.7.2
+
+
+DOWNLOAD_URL="https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/bazelisk-${BAZEL_LAUNCHER_PLATFORM_NAME}-amd64"
+EXPECTED_BINARY_LOCATION="$BAZEL_BIN_LOC/$BAZELISK_VERSION"
+
+if [ ! -f "$EXPECTED_BINARY_LOCATION" ]; then
+  curl -f -L -o "$EXPECTED_BINARY_LOCATION" "$DOWNLOAD_URL"
+  chmod +x $EXPECTED_BINARY_LOCATION
+fi
+exec "$EXPECTED_BINARY_LOCATION" "$@"

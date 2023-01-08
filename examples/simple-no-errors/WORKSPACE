@@ -19,11 +19,6 @@ http_archive(
     url = "https://github.com/bazelbuild/rules_scala/archive/%s.zip" % rules_scala_version,
 )
 
-local_repository(
-    name = "bazel-bsp-rules",
-    path = "../../bazel_rules",
-)
-
 # Stores Scala version and other configuration
 # 2.12 is a default version, other versions can be use by passing them explicitly:
 # scala_config(scala_version = "2.11.12")
@@ -48,8 +43,14 @@ rules_proto_dependencies()
 
 rules_proto_toolchains()
 
-# load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")
-
-# scala_register_toolchains()
-
 register_toolchains("//toolchains:my_scala_toolchain")
+
+# Load bazel-bsp-rules
+
+local_repository(
+    name = "bazel-bsp-rules",
+    path = "../../bazel_rules"
+)
+
+load("@bazel-bsp-rules//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
+bazel_bsp_setup()

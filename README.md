@@ -1,4 +1,5 @@
 # Bazel BSP
+Current Version: [0.0.19](https://github.com/aishfenton/bazel-bsp/releases/tag/v0.0.19)
 
 **NOTE: This is still an alpha version. And fairly new. See TODO below for what's still msising**
 
@@ -21,14 +22,17 @@ Setup `scala_rules` to enable diagnostic files to be written. Instructions for t
 Add the bazel-bsp rules to your workspace
 
 ```starlark
-bazel_bsp_version = "537ad3a3425c5ac9145c7fb98b43b15593f7b4b3"
+bazel_bsp_version = "0.0.19"
 http_archive(
     name = "bazel-bsp-rules",
-    sha256 = "54cc2b198a1d61833a82477aea77268259156015765491f765192ffed22378c6",
-    strip_prefix = "bazel-bsp-%s" % bazel_bsp_version,
+    sha256 = "1e1b5f6f90f14dd481cbc57a4c1ef2a27807b554a36c2a57c6f61aa3b6103248",
+    strip_prefix = "bazel-bsp-%s/bazel_rules" % bazel_bsp_version,
     type = "zip",
-    url = "https://github.com/aishfenton/bazel-bsp/archive/%s.zip" % bazel_bsp_version,
+    url = "https://github.com/aishfenton/bazel-bsp/archive/refs/tags/v%s.zip" % bazel_bsp_version,
 )
+
+load("@bazel-bsp-rules//bazel_rules:bazel_bsp_setup.bzl", "bazel_bsp_setup")
+bazel_bsp_setup()
 ```
 
 And finally add at least one bsp target (although you can add as many as you like) to specify a project to build. To add a bsp target place a `bsp_target` rule in the `BUILD` files, as so:
