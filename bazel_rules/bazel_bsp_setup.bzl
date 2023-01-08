@@ -1,7 +1,7 @@
 load("//private:load_tool.bzl", "load_tool")
 
+# NB: Be careful changing, as sed replaced in release job with latest version/shas
 _version = "0.0.19"
-
 _shas = {
     "linux-x86": "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
     "macos-x86": "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f",

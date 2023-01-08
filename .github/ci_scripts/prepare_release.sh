@@ -18,10 +18,10 @@ BAZEL_RULE = $REPO_DIR/bazel_rules/bazel_bsp_setup.bzl
 
 sed -i "/^_version/s/$PREV_RELEASE/$RELEASE/" $BAZEL_RULE 
 
-update_sha () {
+function update_sha {
     local arch = $1
     local new_sha = $(cat ${DOWNLOAD_DIR}/bazel-bsp-$arch.sha256)
-    sed -i "${arch}\":/s/\".*\"$/$new_sha/" $BAZEL_RULE 
+    sed "${arch}\":/s/\"[a-z0-9]\+\",\?$/\"${new_sha}\",/" $BAZEL_RULE 
 }
 
 update_sha "linux-x86"
