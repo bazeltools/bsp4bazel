@@ -50,7 +50,8 @@ case class BspClient(
       method: String,
       params: A
   ): IO[Unit] =
-    val notification = Notification("2.0", method, Some(Encoder[A].apply(params)))
+    val notification =
+      Notification("2.0", method, Some(Encoder[A].apply(params)))
     bspInQ.offer(JRpcConsoleCodec.encode(notification, false))
 
   private def sendRequest[A: Encoder, B: Decoder](
@@ -156,8 +157,11 @@ case class LspTestProcess(workspaceRoot: Path):
       stream
         .evalMap {
           case n: Notification => IO.pure(n)
-          case resp: Response => IO.pure(resp)
-          case req: Request => IO.raiseError(new Exception(s"Didn't expect to get a request here. Got $req"))
+          case resp: Response  => IO.pure(resp)
+          case req: Request =>
+            IO.raiseError(
+              new Exception(s"Didn't expect to get a request here. Got $req")
+            )
         }
   }
 
@@ -234,13 +238,14 @@ case class LspTestProcess(workspaceRoot: Path):
         exitSwitch
       )
 
-      respNotes <- IO.both(processActions(client, actions, exitSwitch), bspOutIO)
+      respNotes <- IO.both(
+        processActions(client, actions, exitSwitch),
+        bspOutIO
+      )
       (resp, notifications) = respNotes
       _ <- fibErr.cancel
       _ <- fibServer.cancel
-
-    yield
-      (resp, notifications)
+    yield (resp, notifications)
 
   private def start(client: BspClient): IO[InitializeBuildResult] =
     for
@@ -298,7 +303,9 @@ case class Lsp(actions: Vector[Lsp.Action]):
   def shutdown: Lsp =
     this :+ Lsp.Action.Shutdown
 
-  def runIn(workspaceRoot: Path): IO[(List[InitializeBuildResult | Unit], List[Notification])] =
+  def runIn(
+      workspaceRoot: Path
+  ): IO[(List[InitializeBuildResult | Unit], List[Notification])] =
     LspTestProcess(workspaceRoot).runIn(actions.toList)
 
 object Lsp:

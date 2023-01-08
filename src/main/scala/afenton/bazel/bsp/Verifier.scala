@@ -43,13 +43,15 @@ object Verifier:
     et.leftMap(_.toString).value
 
   def bazelHasDiagnosticsEnabled: IO[Either[String, Unit]] =
-    val msg = """Bazel not configured to produce diagnostics messages from Bazel. See TODO to setup"""
+    val msg =
+      """Bazel not configured to produce diagnostics messages from Bazel. See TODO to setup"""
 
     // How to verify this???
     ???
 
   def hasBspConfigFile: IO[Either[String, Unit]] =
-    val msg = """Missing BSP configuration file (i.e. .bsp/bazel-bsp.json) in the current project directory. Run "bazel-bsp --setup" to create."""
+    val msg =
+      """Missing BSP configuration file (i.e. .bsp/bazel-bsp.json) in the current project directory. Run "bazel-bsp --setup" to create."""
 
     for e <- Files[IO].exists(Cwd / ".bsp" / "bazel-bsp.json")
     yield Either.cond(e, (), msg)

@@ -375,34 +375,36 @@ object PublishDiagnosticsParams:
       bt: BuildTargetIdentifier,
       fd: ScalacDiagnostic
   ): Option[PublishDiagnosticsParams] =
-    fd.diagnostics.toList.traverse { scalacD =>
-      scalacD.range.flatMap(Range.fromScalacRange(_))
-        .map {
-          Diagnostic(
-            _,
-            Some(DiagnosticSeverity.fromScalacSeverity(scalacD.severity)),
-            Some(1),
-            None,
-            Some("Scalac"),
-            scalacD.message,
-            None,
-            None,
-            None
-          )
-        }
-    }
-    .map { diagnostics =>
-      val path = fd.path.toString
-        .replaceFirst("^workspace-root://", baseDir.toUri.toString)
+    fd.diagnostics.toList
+      .traverse { scalacD =>
+        scalacD.range
+          .flatMap(Range.fromScalacRange(_))
+          .map {
+            Diagnostic(
+              _,
+              Some(DiagnosticSeverity.fromScalacSeverity(scalacD.severity)),
+              Some(1),
+              None,
+              Some("Scalac"),
+              scalacD.message,
+              None,
+              None,
+              None
+            )
+          }
+      }
+      .map { diagnostics =>
+        val path = fd.path.toString
+          .replaceFirst("^workspace-root://", baseDir.toUri.toString)
 
-      PublishDiagnosticsParams(
-        TextDocumentIdentifier(new URI(path)),
-        bt,
-        None,
-        diagnostics,
-        true
-      )
-    }
+        PublishDiagnosticsParams(
+          TextDocumentIdentifier(new URI(path)),
+          bt,
+          None,
+          diagnostics,
+          true
+        )
+      }
 
 case class TextDocumentIdentifier(uri: URI)
 
@@ -415,7 +417,6 @@ object TextDocumentIdentifier:
 
   def file(file: String): TextDocumentIdentifier =
     this.file(Paths.get(file))
-
 
 case class Diagnostic(
     range: Range,
@@ -500,20 +501,26 @@ object Range:
   def fromScalacRange(rng: ScalacRange): Option[Range] =
     (rng.start, rng.end) match
       case (Some(start), Some(end)) =>
-        Some(Range(
-          Position.fromScalacPosition(start),
-          Position.fromScalacPosition(end)
-        ))
+        Some(
+          Range(
+            Position.fromScalacPosition(start),
+            Position.fromScalacPosition(end)
+          )
+        )
       case (Some(start), None) =>
-        Some(Range(
-          Position.fromScalacPosition(start),
-          Position.fromScalacPosition(start)
-        ))
+        Some(
+          Range(
+            Position.fromScalacPosition(start),
+            Position.fromScalacPosition(start)
+          )
+        )
       case (None, Some(end)) =>
-        Some(Range(
-          Position.fromScalacPosition(end),
-          Position.fromScalacPosition(end)
-        ))
+        Some(
+          Range(
+            Position.fromScalacPosition(end),
+            Position.fromScalacPosition(end)
+          )
+        )
       case (None, None) =>
         None
 
@@ -576,12 +583,12 @@ enum TaskDataKind(val id: String):
 object TaskDataKind:
   given Encoder[TaskDataKind] = Encoder.instance(_.id.asJson)
   given Decoder[TaskDataKind] = Decoder[String].map {
-    case "compile-task" => TaskDataKind.CompileTask
+    case "compile-task"   => TaskDataKind.CompileTask
     case "compile-report" => TaskDataKind.CompileReport
-    case "test-task" => TaskDataKind.TestTask
-    case "test-report" => TaskDataKind.TestReport
-    case "test-start" => TaskDataKind.TestStart
-    case "test-finish" => TaskDataKind.TestFinish
+    case "test-task"      => TaskDataKind.TestTask
+    case "test-report"    => TaskDataKind.TestReport
+    case "test-start"     => TaskDataKind.TestStart
+    case "test-finish"    => TaskDataKind.TestFinish
   }
 
 case class CompileTask(target: BuildTargetIdentifier)

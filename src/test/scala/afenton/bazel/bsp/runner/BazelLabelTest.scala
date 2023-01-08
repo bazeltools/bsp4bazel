@@ -78,8 +78,16 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
       assertEquals(bl1, bl2)
 
     val commonExamples = List(
-      BazelLabel.fromString("//...").toTry.get -> BazelLabel(None, BPath.Wildcard, None),
-      BazelLabel.fromString("//:all").toTry.get -> BazelLabel(None, BPath.BNil, Some(BazelTarget.AllRules)),
+      BazelLabel.fromString("//...").toTry.get -> BazelLabel(
+        None,
+        BPath.Wildcard,
+        None
+      ),
+      BazelLabel.fromString("//:all").toTry.get -> BazelLabel(
+        None,
+        BPath.BNil,
+        Some(BazelTarget.AllRules)
+      ),
       BazelLabel.fromString("//foo/bar:myRule").toTry.get -> BazelLabel(
         None,
         "foo" :: "bar" :: BPath.BNil,
