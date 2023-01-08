@@ -25,7 +25,7 @@ Add the bazel-bsp rules to your workspace
 bazel_bsp_version = "0.0.19"
 http_archive(
     name = "bazel-bsp-rules",
-    sha256 = "1e1b5f6f90f14dd481cbc57a4c1ef2a27807b554a36c2a57c6f61aa3b6103248",
+    sha256 = "<<-- ADD SHA256 HERE -->>",
     strip_prefix = "bazel-bsp-%s/bazel_rules" % bazel_bsp_version,
     type = "zip",
     url = "https://github.com/aishfenton/bazel-bsp/archive/refs/tags/v%s.zip" % bazel_bsp_version,

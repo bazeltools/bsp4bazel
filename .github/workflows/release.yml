@@ -66,7 +66,8 @@ jobs:
           name: bazel-bsp-macos-x86
           path: downloads
       - name: Prepare release
-        run: ./.github/ci_scripts/prepare_release.sh 
+        working-directory: "repo"
+        run: ../.github/ci_scripts/prepare_release.sh 
       - name: Commit changes
         working-directory: "repo"
         run: |
