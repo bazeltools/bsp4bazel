@@ -1,1 +1,4 @@
 workspace(name = "bazel-bsp-rules")
+
+load("//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
+bazel_bsp_setup()
