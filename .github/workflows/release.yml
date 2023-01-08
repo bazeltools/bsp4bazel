@@ -67,7 +67,7 @@ jobs:
           path: downloads
       - name: Prepare release
         working-directory: "repo"
-        run: ../.github/ci_scripts/prepare_release.sh 
+        run: ./.github/ci_scripts/prepare_release.sh 
       - name: Commit changes
         working-directory: "repo"
         run: |
