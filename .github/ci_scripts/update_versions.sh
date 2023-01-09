@@ -4,7 +4,6 @@ set -ex
 
 RELEASE=$1
 SCRIPT_DIR="./.github/ci_scripts"
-SCALA_CLI="scala-cli $SCRIPT_DIR/project.scala"
 BAZEL_RULE="bazel_rules/bazel_bsp_setup.bzl"
 
 if [[ ! "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -12,7 +11,7 @@ if [[ ! "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1 
 fi
 
-CURRENT_VERSION=$($SCALA_CLI $SCRIPT_DIR/currentVersion.scala -- build.sbt)
+CURRENT_VERSION=$(scala-cli $SCRIPT_DIR/currentVersion.scala -- build.sbt)
 echo "Updating from release number $CURRENT_VERSION"
 
 # ---
