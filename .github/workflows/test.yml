@@ -29,8 +29,11 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: 'sbt'
+    - uses: VirtusLab/scala-cli-setup@main 
     - name: Run tests
       run: sbt test
-      # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
+    # Also test release scripts (the ones we can)
+    - name: Run scala-cli tests
+      run: scala-cli test ./.github/ci_sripts
     - name: Upload dependency graph
       uses: scalacenter/sbt-dependency-submission@ab086b50c947c9774b70f39fc7f6e20ca2706c91

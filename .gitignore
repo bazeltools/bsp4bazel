@@ -2,6 +2,8 @@
 .metals
 .vscode
 target/
+bazel_rules/bazel-*
 examples/**/bazel-*
 project/**/metals.sbt
 .bsp/sbt.json
+.scala-build
