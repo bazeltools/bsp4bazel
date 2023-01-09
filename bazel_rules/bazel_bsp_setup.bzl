@@ -1,11 +1,12 @@
 load("//private:load_tool.bzl", "load_tool")
 
-# NB: Be careful changing, as sed replaced in release job with latest version/shas
-_version = "0.0.19"
-_shas = {
-    "linux-x86": "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
-    "macos-x86": "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f",
+# <--- Updated automatically by release job
+_bazel_bsp_version = "0.0.20"
+_build_artifact_shas = {
+    "linux-x86": "15bb83b9e5a700d0331ca1a37d3cccf7c2b2106a65acd74c2c72e36175dad9cd",
+    "macos-x86": "b39813b1afca6e25975ed713727b6bbac599ed04eb7aff32c9ceeacda834efcc"
 }
+# --->
 
 def _bazel_bsp_load(platform):
     name = "bazel-bsp-{}".format(platform)
@@ -13,11 +14,11 @@ def _bazel_bsp_load(platform):
     load_tool(
         name = name,
         urls = [
-            "https://github.com/aishfenton/bazel-bsp/releases/download/v{}/{}".format(_version, name),
+            "https://github.com/aishfenton/bazel-bsp/releases/download/v{}/{}".format(_bazel_bsp_version, name),
         ],
         packaged = False,
         binary_path = "bazel-bsp-linux-x86",
-        sha256 = _shas[platform],
+        sha256 = _build_artifact_shas[platform],
     )
 
 def bazel_bsp_setup():

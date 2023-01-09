@@ -14,6 +14,23 @@ on:
         type: string
 
 jobs:
+  make-bazel-rules:
+    name: Make bazel rules artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3 
+      - name: Tar bazel_rules dir
+        run: |
+          tar -czvf bazel_rules.tar.gz bazel_rules/
+      # Generate a SHA256, and move both files into stagging dir
+      - name: Prepare output
+        run: |
+          ./.github/ci_scripts/prepare_output.sh bazel_rules.tar.gz staging-directory bazel_rules.tar.gz 
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: bazel_rules
+          path: staging-directory
   make-binaries:
     strategy:
       matrix:
@@ -30,45 +47,63 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Print version
-        run: echo Doing release for ${{ inputs.version }} 
+        run: |
+          echo Performing release for ${{ inputs.version }} 
+      - uses: VirtusLab/scala-cli-setup@main
       - uses: graalvm/setup-graalvm@v1
         with:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
           cache: 'sbt'
+      # We have to update the version in build.sbt first, as that gets backed into the native-image (via sbt-buildinfo)
+      - name: Update versions
+        run: | 
+          ./.github/ci_scripts/update.sh ${{ inputs.version }} 
       - name: Run native image
         run: |
           sbt graalvm-native-image:packageBin
+      # Generate a SHA256, and move both files into stagging dir
       - name: Prepare output
-        run: ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
+        run: |
+          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
       - name: Upload binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.artifact }}
           path: staging-directory
   make_release:
     name: Make release
-    needs: [make-binaries]
+    needs: [make-binaries, make-bazel-rules]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           path: "repo"
+      - uses: VirtusLab/scala-cli-setup@main 
+      # Download the aritfacts produced in the preceeding jobs
       - name: Download linux 20.04
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: bazel-bsp-linux-x86
           path: downloads
       - name: Download macos x86
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: bazel-bsp-macos-x86
           path: downloads
-      - name: Prepare release
+      # Download bazel_rules.tar.bz
+      - name: Download bazel_rule 
+        uses: actions/download-artifact@v3
+        with:
+          name: bazel_rules
+          path: downloads
+      # Update version number, and arifact SHAs in files 
+      - name: Update version and shas
         working-directory: "repo"
-        run: ./.github/ci_scripts/prepare_release.sh 
-      - name: Commit changes
+        run: |
+          ./.github/ci_scripts/update.sh ${{ inputs.version }} all
+      - name: Commit updates
         working-directory: "repo"
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -80,9 +115,12 @@ jobs:
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
           prerelease: false
           files: |
             downloads/bazel-bsp-linux-x86
             downloads/bazel-bsp-linux-x86.sha256
             downloads/bazel-bsp-macos-x86
             downloads/bazel-bsp-macos-x86.sha256
+            downloads/bazel_rules.tar.gz
+            downloads/bazel_rules.tar.gz.sha256
