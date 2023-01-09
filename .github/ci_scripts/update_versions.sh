@@ -3,7 +3,7 @@
 set -ex
 
 RELEASE=$1
-SCRIPT_DIR="./github/ci_scripts"
+SCRIPT_DIR="./.github/ci_scripts"
 SCALA_CLI="scala-cli $SCRIPT_DIR/project.scala"
 BAZEL_RULE="bazel_rules/bazel_bsp_setup.bzl"
 
