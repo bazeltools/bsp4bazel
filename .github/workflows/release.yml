@@ -14,6 +14,9 @@ on:
         type: string
 
 jobs:
+  make-bazel-rules:
+    name: Make Bazel Rules artifact
+    runs-on: ubuntu-latest
   make-binaries:
     strategy:
       matrix:
@@ -30,18 +33,25 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Print version
-        run: echo Doing release for ${{ inputs.version }} 
+        run: echo Performing release for ${{ inputs.version }} 
+      - uses: VirtusLab/scala-cli-setup@main
       - uses: graalvm/setup-graalvm@v1
         with:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
           cache: 'sbt'
+      # We have to update the version in build.sbt first, as that gets backed into the native-image (via sbt-buildinfo)
+      - name: Update versions
+        run: | 
+          ./.github/ci_scripts/update_versions.sh ${{ inputs.version }}
       - name: Run native image
         run: |
           sbt graalvm-native-image:packageBin
+      # Generate a SHA256, and move both files into stagging dir
       - name: Prepare output
-        run: ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
+        run: |
+          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging-directory ${{ matrix.artifact }} 
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
@@ -49,12 +59,14 @@ jobs:
           path: staging-directory
   make_release:
     name: Make release
-    needs: [make-binaries]
+    needs: [make-binaries, make-bazel-rules]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           path: "repo"
+      - uses: VirtusLab/scala-cli-setup@main 
+      # Down the aritfacts produced in the preceeding job
       - name: Download linux 20.04
         uses: actions/download-artifact@v1
         with:
@@ -65,10 +77,13 @@ jobs:
         with:
           name: bazel-bsp-macos-x86
           path: downloads
-      - name: Prepare release
+      # Update version number, and arifact SHAs in files 
+      - name: Update version and shas
         working-directory: "repo"
-        run: ./.github/ci_scripts/prepare_release.sh 
-      - name: Commit changes
+        run: |
+          ./.github/ci_scripts/update_versions.sh ${{ inputs.version }}    
+          scala-cli ./.github/ci_scripts/updateArtifactShas.scala -- bazel_rules/bazel_bsp_setup.bzl ../downloads > bazel_rules/bazel_bsp_setup.bzl
+      - name: Commit updates
         working-directory: "repo"
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"

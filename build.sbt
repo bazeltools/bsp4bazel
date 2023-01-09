@@ -3,12 +3,16 @@ val scala3Version = "3.2.1"
 enablePlugins(GraalVMNativeImagePlugin)
 enablePlugins(BuildInfoPlugin)
 
+// <--- Updated automatically by release job
+val bazelBspVersion = "0.0.19"
+// --->
+
 lazy val root = project
   .in(file("."))
   .settings(
     name := "bazel-bsp",
     organization := "afenton",
-    version := "0.0.19",
+    version := bazelBspVersion, 
     scalaVersion := scala3Version,
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.4.4",
     libraryDependencies += "co.fs2" %% "fs2-core" % "3.4.0",
