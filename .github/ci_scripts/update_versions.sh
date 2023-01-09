@@ -7,8 +7,8 @@ SCRIPT_DIR="./github/ci_scripts"
 SCALA_CLI="scala-cli $SCRIPT_DIR/project.scala"
 BAZEL_RULE="bazel_rules/bazel_bsp_setup.bzl"
 
-if [[ "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "Release version wasn't in correct format. Got: $RELEASE"
+if [[ ! "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Release version wasnt in correct format. Got: $RELEASE"
     exit 1 
 fi
 
