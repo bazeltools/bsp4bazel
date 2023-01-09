@@ -26,9 +26,9 @@ bazel_bsp_version = "0.0.19"
 http_archive(
     name = "bazel-bsp-rules",
     sha256 = "<<-- ADD SHA256 HERE -->>",
-    strip_prefix = "bazel-bsp-%s/bazel_rules" % bazel_bsp_version,
-    type = "zip",
-    url = "https://github.com/aishfenton/bazel-bsp/archive/refs/tags/v%s.zip" % bazel_bsp_version,
+    strip_prefix = "bazel_rules",
+    type = "tar.gz",
+    url = "https://github.com/aishfenton/bazel-bsp/releases/download/v{}/bazel_rules.tar.gz" % bazel_bsp_version,
 )
 
 load("@bazel-bsp-rules//bazel_rules:bazel_bsp_setup.bzl", "bazel_bsp_setup")

@@ -1,13 +1,34 @@
 //> using scala "3.2"
 //> using lib "com.lihaoyi::os-lib:0.9.0"
 
+import scala.util.matching.Regex
+
 private def join(l1: String, l2: String): String =
   if l1.isEmpty then l2
   else s"$l1\n$l2"
 
-// Substitutes in new SHA defintions
-def substituteShaDefinitions(
-    fileContent: String,
+def sed(
+    input: String,
+    linePattern: Regex,
+    replacePattern: Regex,
+    replacement: String
+): String =
+  input
+    .split("\n")
+    .map { line =>
+      if linePattern.findFirstIn(line).isDefined then
+        replacePattern.replaceAllIn(line, replacement)
+      else line
+    }
+    .mkString("\n")
+
+// Substitutes bazel_rule SHA into README
+def substituteReadme(readmeContent: String, newSha: String): String =
+  sed(readmeContent, raw"sha256 =".r, raw"\"[a-f0-9]{64}\"".r, s"\"$newSha\"")
+
+// Substitutes new SHA defintions into Python
+def substituteBazelRule(
+    ruleContent: String,
     newDefinitions: String
 ): String =
 
@@ -16,11 +37,11 @@ def substituteShaDefinitions(
   val endExpr = raw"\}".r
 
   require(
-    !startExpr.findAllIn(fileContent).toList.isEmpty,
+    !startExpr.findAllIn(ruleContent).toList.isEmpty,
     s"File doesn't contain expected expression: $startExpr"
   )
 
-  val stripped = fileContent
+  val stripped = ruleContent
     .split("\n")
     .foldLeft((false, "")) {
       // Start def
@@ -44,17 +65,15 @@ def substituteShaDefinitions(
 
   stripped.replaceAllLiterally(placeholder, newDefinitions)
 
-def generateShaDefinitions(artifacts: List[(os.Path, String)]): String =
+def generatePythonMap(artifacts: Map[String, String]): String =
   require(!artifacts.isEmpty, "No artifacts found")
 
   // e.g. /my/path/to/bazel-bsp-linux-x86.sha256
   val filePattern = raw"^bazel-bsp-([\w-]+).sha256$$".r
 
   val inner = artifacts
-    .map { (artifact, sha) =>
-      val filename = artifact.last
+    .map { (filename, sha) =>
       val filePattern(arch) = filename: @unchecked
-
       (arch.trim, sha.trim)
     }
     .map { (arch, sha) =>
@@ -68,32 +87,51 @@ def generateShaDefinitions(artifacts: List[(os.Path, String)]): String =
     "}"
   ).mkString("\n")
 
+private def binEntries(map: Map[String, String]): Map[String, String] =
+  map.filterKeys(_.contains("bazel-bsp")).toMap
 
 /** Update the given inputFile with the SHA256 of the artifacts in artifactDir.
   * And print to stdout.
   *
-  * @param inputFile
-  *   The file to update
+  * @param bazelRuleFile
+  *   The bazel_rule file to update
+  * @param readmeFile
+  *   The README file to update
   * @param artifactDir
   *   The directory where artifacts are stored
   */
-@main def updateArtifactShas(inputFile: String, artifactDir: String) =
+@main def updateArtifactShas(
+    bazelRuleFile: String,
+    readmeFile: String,
+    artifactDir: String
+) =
 
+  val bazelRulePath = os.Path(bazelRuleFile, os.pwd)
+  val readmePath = os.Path(readmeFile, os.pwd)
   val artifactPath = os.Path(artifactDir, os.pwd)
-  val inputPath = os.Path(inputFile, os.pwd)
 
   require(os.isDir(artifactPath), s"${artifactPath} is not a directory")
-  require(os.exists(inputPath), s"$inputPath file wans't found")
+  List(bazelRulePath, readmePath).foreach { f =>
+    require(os.exists(f), s"$f file wasn't found")
+  }
 
-  val artifactShas = os
+  val artifactShas: Map[String, String] = os
     .list(artifactPath)
     .filter(_.ext == "sha256")
-    .map(a => (a, os.read(a)))
-    .toList
+    .map(a => (a.last, os.read(a)))
+    .toMap
 
-  val newContent = substituteShaDefinitions(
-    os.read(inputPath),
-    generateShaDefinitions(artifactShas)
+  val newRule = substituteBazelRule(
+    os.read(bazelRulePath),
+    generatePythonMap(binEntries(artifactShas))
   )
 
-  println(newContent)
+  println(s"Writing new $bazelRulePath")
+  os.write.over(bazelRulePath, newRule)
+
+  val newReadme = substituteBazelRule(
+    os.read(readmePath),
+    artifactShas("bazel_rules.tar.gz.sha256")
+  )
+  println(s"Writing new $readmePath")
+  os.write.over(readmePath, newReadme)
