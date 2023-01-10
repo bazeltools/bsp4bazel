@@ -1,5 +1,5 @@
 # Bazel BSP
-Current Version: [0.0.22](https://github.com/aishfenton/bazel-bsp/releases/tag/v0.0.22)
+Current Version: [0.0.22](https://github.com/aishfenton/bazel-bsp/releases/tag/0.0.22)
 
 **NOTE: This is still an alpha version. And fairly new. See TODO below for what's still msising**
 

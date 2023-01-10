@@ -94,7 +94,7 @@ def updateArtifactShas(
   val artifactShas: Map[String, String] = os
     .list(artifactPath)
     .filter(_.ext == "sha256")
-    .map(a => (a.last, os.read(a)))
+    .map(a => (a.last, os.read(a).trim))
     .toMap
 
   val newRule = substituteBazelRule(
