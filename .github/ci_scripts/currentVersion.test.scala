@@ -1,6 +1,4 @@
-//> using scala "3.2"
-//> using lib "com.lihaoyi::os-lib:0.9.0"
-//> using lib "org.scalameta::munit::0.7.29"
+//> using file "project.scala"
 
 class CurrentVersionTest extends munit.FunSuite {
 

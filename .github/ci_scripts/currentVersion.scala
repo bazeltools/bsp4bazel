@@ -1,5 +1,4 @@
-//> using scala "3.2"
-//> using lib "com.lihaoyi::os-lib:0.9.0"
+//> using file "project.scala"
 
 case class SemVer(major: Int, minor: Int, patch: Int):
   def asString: String = s"$major.$minor.$patch"

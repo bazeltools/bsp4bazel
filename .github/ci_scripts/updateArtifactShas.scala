@@ -1,5 +1,4 @@
-//> using scala "3.2"
-//> using lib "com.lihaoyi::os-lib:0.9.0"
+//> using file "project.scala"
 
 import scala.util.matching.Regex
 
@@ -9,7 +8,7 @@ private def join(l1: String, l2: String): String =
 
 // Substitutes bazel_rule SHA into README
 def substituteReadme(readmeContent: String, newSha: String): String =
-  sed(readmeContent, raw"sha256 =".r, raw"\"[a-f0-9]{64}\"".r, s"\"$newSha\"")
+  performSed(readmeContent, raw"sha256 =".r, raw"\"[a-f0-9]{64}\"".r, s"\"$newSha\"")
 
 // Substitutes new SHA defintions into Python
 def substituteBazelRule(

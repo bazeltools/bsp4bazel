@@ -1,22 +1,6 @@
-//> using scala "3.2"
-//> using lib "com.lihaoyi::os-lib:0.9.0"
+//> using file "project.scala"
 
 import scala.util.matching.Regex
-
-def sed(
-    input: String,
-    linePattern: Regex,
-    replacePattern: Regex,
-    replacement: String
-): String =
-  input
-    .split("\n")
-    .map { line =>
-      if linePattern.findFirstIn(line).isDefined then
-        replacePattern.replaceAllIn(line, replacement)
-      else line
-    }
-    .mkString("\n")
 
 /** A simple sed implementation, that works cross-platform (subtle differences
   * between mac/linux were causing problems)
@@ -43,7 +27,7 @@ def sed(
   val inputPath = os.Path(inputFile, os.pwd)
 
   val content = os.read(inputPath)
-  val newContent = sed(
+  val newContent = performSed(
     content,
     linePattern.r,
     replacementPattern.r,
