@@ -26,7 +26,7 @@ $SED true "^val bazelBspVersion" $CURRENT_VERSION $RELEASE build.sbt
 # ---
 # update bazel_rules/bazel_bsp_setup.bzl
 
-$SED true "^_bazel_bsp_version $CURRENT_VERSION $RELEASE $BAZEL_RULE
+$SED true "^_bazel_bsp_version" $CURRENT_VERSION $RELEASE $BAZEL_RULE
 
 # ---
 # update README.md
