@@ -29,7 +29,7 @@ http_archive(
 ",
     strip_prefix = "bazel_rules",
     type = "tar.gz",
-    url = "https://github.com/aishfenton/bazel-bsp/releases/download/v{}/bazel_rules.tar.gz" % bazel_bsp_version,
+    url = "https://github.com/aishfenton/bazel-bsp/releases/download/{}/bazel_rules.tar.gz" % bazel_bsp_version,
 )
 
 load("@bazel-bsp-rules//bazel_rules:bazel_bsp_setup.bzl", "bazel_bsp_setup")
