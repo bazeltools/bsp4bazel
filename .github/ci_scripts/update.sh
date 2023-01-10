@@ -6,7 +6,6 @@ RELEASE=$1
 echo "Updating to version $1"
 
 function run() {
-    echo "Running $1"
     scala-cli .github/ci_scripts/$1.scala -- ${@:2}
 }
 
