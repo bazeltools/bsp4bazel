@@ -1,5 +1,5 @@
 # Bazel BSP
-Current Version: [0.0.21](https://github.com/aishfenton/bazel-bsp/releases/tag/v0.0.21)
+Current Version: [0.0.22](https://github.com/aishfenton/bazel-bsp/releases/tag/v0.0.22)
 
 **NOTE: This is still an alpha version. And fairly new. See TODO below for what's still msising**
 
@@ -22,7 +22,7 @@ Setup `scala_rules` to enable diagnostic files to be written. Instructions for t
 Add the bazel-bsp rules to your workspace
 
 ```starlark
-bazel_bsp_version = "0.0.21"
+bazel_bsp_version = "0.0.22"
 http_archive(
     name = "bazel-bsp-rules",
     sha256 = "b67c06c9f0ba211adec6e6fef7fb65e2a77434c5f708b981d0621a2ee23a0440
