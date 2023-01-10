@@ -57,8 +57,8 @@ trait Console:
   def outLines: List[String] 
   def errLines: List[String] 
 
-  def printOuts: Unit = print(outLines.mkString)
-  def printErrs: Unit = print(errLines.mkString)
+  def printOuts: Unit = System.out.print(outLines.mkString)
+  def printErrs: Unit = System.err.print(errLines.mkString)
 
 object Console:
   def default: Console = new ConsoleImpl

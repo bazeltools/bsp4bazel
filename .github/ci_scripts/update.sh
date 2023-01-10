@@ -10,7 +10,7 @@ echo "Updating to version $1"
 CURRENT_VERSION=$(scala-cli $SCRIPT_DIR/currentVersion.scala -- build.sbt) 
 echo "Current version is $CURRENT_VERSION"
 
-scala-cli SCRIPT_DIR/updateVersions.scala -- $CURRENT_VERSION $RELEASE
+scala-cli $SCRIPT_DIR/updateVersions.scala -- $CURRENT_VERSION $RELEASE
 
 if [ "$2" = "all" ]
 then
