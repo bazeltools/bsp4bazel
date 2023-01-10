@@ -17,7 +17,7 @@ def substituteBazelRule(
 ): String =
 
   val placeholder: String = "<<-- PLACEHOLDER -->>"
-  val startExpr = raw"_build_artifact_shas = \{".r
+  val startExpr = raw"_build_artifact_shas = {".r
   val endExpr = raw"\}".r
 
   require(
