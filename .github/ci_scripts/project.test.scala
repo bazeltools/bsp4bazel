@@ -34,15 +34,19 @@ jumped over the
 lazy dog
 """.trim
 
-    val result = sed(lines, "over".r, "ed".r, "ing")
+    val result1 = sed(lines, "over".r, "ed".r, "ing")
     assertEquals(
-      result,
-      """
+      result1,
+      Some("""
 A quick brown fox
 jumping over the 
 lazy dog
     """.trim
+      )
     )
+
+    val result2 = sed(lines, "not-there".r, "ed".r, "ing")
+    assertEquals(result2, None)
   }
 
 }

@@ -14,7 +14,7 @@ def _bazel_bsp_load(platform):
     load_tool(
         name = name,
         urls = [
-            "https://github.com/aishfenton/bazel-bsp/releases/download/v{}/{}".format(_bazel_bsp_version, name),
+            "https://github.com/aishfenton/bazel-bsp/releases/download/{}/{}".format(_bazel_bsp_version, name),
         ],
         packaged = False,
         binary_path = "bazel-bsp-linux-x86",

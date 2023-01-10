@@ -20,7 +20,10 @@ def updateFile(
           throw new Exception(s"Invalid version string: $verStr")
     }
 
-  require(newVersion > currentVersion, s"New version isn't greater than current version: n:$newVersion, c:$currentVersion")
+  require(
+    newVersion > currentVersion,
+    s"New version isn't greater than current version: n:$newVersion, c:$currentVersion"
+  )
 
   val newContent =
     sed(
@@ -28,7 +31,9 @@ def updateFile(
       linePattern.r,
       raw"(\d+)\.(\d+).(\d+)".r,
       newVersion.asString
-    )
+    ) match
+      case Some(value) => value
+      case None        => throw new Exception(s"No substitutions made in $filePath")
 
   println(s"Updating $filePath")
   os.write.over(filePath, newContent)

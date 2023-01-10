@@ -31,22 +31,44 @@ def sed(
     input: String,
     replacePattern: Regex,
     replacement: String
-): String = sed(input, replacePattern, replacePattern, replacement)
+): Option[String] = sed(input, replacePattern, replacePattern, replacement)
 
+/** JVM version of SED (to avoid cross-platform differences).
+  *
+  * @param input
+  *   Content to update
+  * @param linePattern
+  *   Only change lines that match this pattern
+  * @param replacePattern
+  *   Replacement pattern
+  * @param replacement
+  *   Text to repace with.
+  * @return
+  *   None, if no replacements made, otherwise Some(new content)
+  */
 def sed(
     input: String,
     linePattern: Regex,
     replacePattern: Regex,
     replacement: String
-): String =
-  input
-    .split("\n")
-    .map { line =>
-      if linePattern.findFirstIn(line).isDefined then
-        replacePattern.replaceAllIn(line, replacement)
-      else line
-    }
-    .mkString("\n")
+): Option[String] =
+  var i = 0
+  var didReplace = false
+  val lines = input.split("\n")
+
+  while i < lines.length
+  do
+    val line = lines(i)
+    linePattern.findFirstIn(line) match
+      case Some(_) =>
+        val newLine = replacePattern.replaceAllIn(line, replacement)
+        if newLine != line then
+          didReplace = true
+          lines(i) = newLine
+      case None => // noop
+    i += 1
+
+  if didReplace then Some(lines.mkString("\n")) else None
 
 trait Console:
   def print(s: String): Unit
@@ -54,8 +76,8 @@ trait Console:
   def error(s: String): Unit
   def errorln(s: String): Unit
 
-  def outLines: List[String] 
-  def errLines: List[String] 
+  def outLines: List[String]
+  def errLines: List[String]
 
   def printOuts: Unit = System.out.print(outLines.mkString)
   def printErrs: Unit = System.err.print(errLines.mkString)
@@ -76,7 +98,7 @@ object Console:
     def errLines: List[String] = errBuffer.toList
 
 def runWith[A](fn: (os.Path, Console) => Unit): Unit =
-  val console = Console.default 
+  val console = Console.default
   fn(os.pwd, console)
-  console.printOuts 
+  console.printOuts
   console.printErrs

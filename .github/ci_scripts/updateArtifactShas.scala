@@ -8,7 +8,12 @@ private def join(l1: String, l2: String): String =
 
 // Substitutes bazel_rule SHA into README
 def substituteReadme(readmeContent: String, newSha: String): String =
-  sed(readmeContent, raw"sha256 =".r, raw"\"[a-f0-9]{64}\"".r, s"\"$newSha\"")
+  sed(readmeContent, "sha256 =".r, s"\"[a-f0-9]{64}\"".r, s"\"$newSha\"") match
+    case Some(c) => c
+    case None =>
+      throw new Exception(
+        s"No substitutions made in README.md, with content: $readmeContent"
+      )
 
 // Substitutes new SHA defintions into Python
 def substituteBazelRule(
@@ -109,6 +114,7 @@ def updateArtifactShas(
     os.read(readmePath),
     artifactShas("bazel_rules.tar.gz.sha256")
   )
+
   println(s"Writing new $readmePath")
   os.write.over(readmePath, newReadme)
 
