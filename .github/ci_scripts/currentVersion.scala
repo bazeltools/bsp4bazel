@@ -18,7 +18,8 @@ def currentVersion(buildFile: String, cwd: os.Path, console: Console): Unit =
 
   val content = os.read(buildPath)
   extractVersion(content) match
-    case Some(semVer) => console.println(semVer.asString) 
+    case Some(semVer) => 
+      console.println(semVer.asString) 
     case None =>
       throw new Exception(s"Didn't find version in build file: $content")
 

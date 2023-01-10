@@ -3,18 +3,16 @@
 set -xe
 
 RELEASE=$1
+SCRIPT_DIR=".github/ci_scripts"
+
 echo "Updating to version $1"
 
-function run() {
-    echo "Running $1"
-    scala-cli .github/ci_scripts/$1.scala -- ${@:2}
-}
+CURRENT_VERSION=$(scala-cli $SCRIPT_DIR/currentVersion.scala -- build.sbt) 
+echo "Current version is $CURRENT_VERSION"
 
-CURRENT_VERSION=$(run currentVersion build.sbt) 
+scala-cli $SCRIPT_DIR/updateVersions.scala -- $CURRENT_VERSION $RELEASE
 
-run updateVersions $CURRENT_VERSION $RELEASE
-
-if [ "$2" == "all" ]
+if [ "$2" = "all" ]
 then
-    run updateArtifactShas "bazel_rules/bazel_bsp_setup.bzl" README.md ../downloads
+    scala-cli $SCRIPT_DIR/updateArtifactShas.scala -- "bazel_rules/bazel_bsp_setup.bzl" README.md ../downloads
 fi
