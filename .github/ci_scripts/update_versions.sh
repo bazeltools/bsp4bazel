@@ -20,13 +20,16 @@ echo "Updating from release number $CURRENT_VERSION"
 # NB: Note not using -i flag as not supported on macos :(
 
 sed "/^val bazelBspVersion/s/$CURRENT_VERSION/$RELEASE/g" build.sbt > build.sbt
+cat build.sbt
 
 # ---
 # update bazel_rules/bazel_bsp_setup.bzl
 
 sed "/^_bazel_bsp_version/s/$CURRENT_VERSION/$RELEASE/" $BAZEL_RULE > $BAZEL_RULE
+cat build.sbt
 
 # ---
 # update README.md
 
 sed "s/$CURRENT_VERSION/$RELEASE/g" README.md > README.md
+cat build.sbt
