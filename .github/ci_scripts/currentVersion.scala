@@ -18,7 +18,7 @@ def extractVersion(buildContent: String): Option[SemVer] =
   * @param buildFile
   *   Path to build.sbt
   */
-@main def currentVersion(buildFile: String) =
+@main def currentVersion(buildFile: String): Unit =
 
   val buildPath = os.Path(buildFile, os.pwd)
   require(os.exists(buildPath), s"$buildPath file wasn't found")

@@ -6,6 +6,8 @@ RELEASE=$1
 SCRIPT_DIR="./.github/ci_scripts"
 BAZEL_RULE="bazel_rules/bazel_bsp_setup.bzl"
 
+SED="scala-cli ./.github/ci_scripts/sed.scala --"
+
 if [[ ! "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "Release version wasnt in correct format. Got: $RELEASE"
     exit 1 
@@ -19,17 +21,14 @@ echo "Updating from release number $CURRENT_VERSION"
 
 # NB: Note not using -i flag as not supported on macos :(
 
-sed "/^val bazelBspVersion/s/$CURRENT_VERSION/$RELEASE/g" build.sbt > build.sbt
-cat build.sbt
+$SED true "^val bazelBspVersion" $CURRENT_VERSION $RELEASE build.sbt
 
 # ---
 # update bazel_rules/bazel_bsp_setup.bzl
 
-sed "/^_bazel_bsp_version/s/$CURRENT_VERSION/$RELEASE/" $BAZEL_RULE > $BAZEL_RULE
-cat build.sbt
+$SED true "^_bazel_bsp_version $CURRENT_VERSION $RELEASE $BAZEL_RULE
 
 # ---
 # update README.md
 
-sed "s/$CURRENT_VERSION/$RELEASE/g" README.md > README.md
-cat build.sbt
+$SED true "." $CURRENT_VERSION $RELEASE README.md 

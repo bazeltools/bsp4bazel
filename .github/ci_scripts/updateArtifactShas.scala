@@ -7,21 +7,6 @@ private def join(l1: String, l2: String): String =
   if l1.isEmpty then l2
   else s"$l1\n$l2"
 
-def sed(
-    input: String,
-    linePattern: Regex,
-    replacePattern: Regex,
-    replacement: String
-): String =
-  input
-    .split("\n")
-    .map { line =>
-      if linePattern.findFirstIn(line).isDefined then
-        replacePattern.replaceAllIn(line, replacement)
-      else line
-    }
-    .mkString("\n")
-
 // Substitutes bazel_rule SHA into README
 def substituteReadme(readmeContent: String, newSha: String): String =
   sed(readmeContent, raw"sha256 =".r, raw"\"[a-f0-9]{64}\"".r, s"\"$newSha\"")
@@ -104,7 +89,7 @@ private def binEntries(map: Map[String, String]): Map[String, String] =
     bazelRuleFile: String,
     readmeFile: String,
     artifactDir: String
-) =
+): Unit =
 
   val bazelRulePath = os.Path(bazelRuleFile, os.pwd)
   val readmePath = os.Path(readmeFile, os.pwd)

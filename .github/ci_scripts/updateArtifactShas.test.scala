@@ -20,18 +20,6 @@ class UpdateArtifactShasTest extends munit.FunSuite {
     assertEquals(output, FixtureData.updatedRule)
   }
 
-  test("should work like sed") {
-    val result = sed(FixtureData.lines, "over".r, "ed".r, "ing")
-    assertEquals(
-      result,
-      """
-A quick brown fox
-jumping over the 
-lazy dog
-    """.trim
-    )
-  }
-
   test("should substitute sha in readme") {
     val result = substituteReadme(FixtureData.originalReadme, FixtureData.artifactShas("bazel-rules.tar.gz.sha256"))
     assertEquals(
@@ -43,12 +31,6 @@ lazy dog
 }
 
 object FixtureData:
-
-  val lines = """
-A quick brown fox
-jumped over the 
-lazy dog
-""".trim
 
   val artifactShas: Map[String, String] = Map(
     "bazel-bsp-linux-x86.sha256" -> "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
