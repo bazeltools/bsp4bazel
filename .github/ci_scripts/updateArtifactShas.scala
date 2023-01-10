@@ -17,12 +17,12 @@ def substituteBazelRule(
 ): String =
 
   val placeholder: String = "<<-- PLACEHOLDER -->>"
-  val startExpr = raw"_build_artifact_shas = {".r
+  val startExpr = raw"_build_artifact_shas = \{".r
   val endExpr = raw"\}".r
 
   require(
     !startExpr.findAllIn(ruleContent).toList.isEmpty,
-    s"File doesn't contain expected expression: $startExpr"
+    s"Didn't find expected expression $startExpr in:\n$ruleContent"
   )
 
   val stripped = ruleContent
@@ -113,7 +113,7 @@ private def binEntries(map: Map[String, String]): Map[String, String] =
   println(s"Writing new $bazelRulePath")
   os.write.over(bazelRulePath, newRule)
 
-  val newReadme = substituteBazelRule(
+  val newReadme = substituteReadme(
     os.read(readmePath),
     artifactShas("bazel_rules.tar.gz.sha256")
   )
