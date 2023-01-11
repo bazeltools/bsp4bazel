@@ -40,7 +40,8 @@ class BazelBspServer(
       _ <- stateRef.update(state =>
         state.copy(
           workspaceRoot = Some(workspaceRoot),
-          bazelRunner = Some(BazelRunner.default(workspaceRoot, bazelWrapper, logger))
+          bazelRunner =
+            Some(BazelRunner.default(workspaceRoot, bazelWrapper, logger))
         )
       )
       resp <- IO.pure {
@@ -72,7 +73,9 @@ class BazelBspServer(
           ws.targets.map(_.id)
         )
       }
-      _ <- stateRef.update(s => s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts)))
+      _ <- stateRef.update(s =>
+        s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts))
+      )
     yield ()
 
   def buildTargetInverseSources(
@@ -174,11 +177,13 @@ class BazelBspServer(
             yield ()
           }
           .evalTap { fd =>
-            PublishDiagnosticsParams.fromScalacDiagnostic(
-              workspaceRoot,
-              target,
-              fd
-            ).mapToIO(client.publishDiagnostics(_))
+            PublishDiagnosticsParams
+              .fromScalacDiagnostic(
+                workspaceRoot,
+                target,
+                fd
+              )
+              .mapToIO(client.publishDiagnostics(_))
           }
           .compile
           .toList
@@ -200,7 +205,8 @@ class BazelBspServer(
         .map(_.clearDiagnostics)
         .traverse { fd =>
           PublishDiagnosticsParams
-            .fromScalacDiagnostic(root, target, fd).asIO
+            .fromScalacDiagnostic(root, target, fd)
+            .asIO
         }
       _ <- clearDiagnostics.traverse_(client.publishDiagnostics)
       _ <- stateRef.update(_.copy(currentErrors = fds))
@@ -247,8 +253,7 @@ class BazelBspServer(
     yield ()
 
   def buildShutdown(params: Unit): IO[Unit] =
-    for
-      _ <- logger.info("build/shutdown")
+    for _ <- logger.info("build/shutdown")
     yield ()
 
   def buildExit(params: Unit): IO[Unit] =
@@ -332,11 +337,10 @@ object BazelBspServer:
     ServerState(BazelBspServer.TargetSourceMap.empty, Nil, None, None, Nil)
 
   def create(client: BspClient, logger: Logger): IO[BazelBspServer] =
-    for 
+    for
       exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
       stateRef <- Ref.of[IO, BazelBspServer.ServerState](defaultState)
-    yield
-      BazelBspServer(client, logger, stateRef, exitSwitch)
+    yield BazelBspServer(client, logger, stateRef, exitSwitch)
 
   protected case class TargetSourceMap(
       val _targetSources: Map[BuildTargetIdentifier, List[

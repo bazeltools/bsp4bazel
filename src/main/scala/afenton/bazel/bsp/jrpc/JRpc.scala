@@ -97,7 +97,6 @@ object Response:
       yield Response(jsonrpc, id, result, error)
     }
 
-
 case class Notification(jsonrpc: "2.0", method: String, params: Option[Json])
     extends Message
 object Notification:
@@ -137,7 +136,7 @@ given encodeIntOrString: Encoder[Int | String] =
 def jRpcParser(logger: Logger): Pipe[IO, String, Message] =
   def go(
       remaining: String,
-      stream: Stream[IO, String],
+      stream: Stream[IO, String]
   ): Pull[IO, Message, Unit] =
     stream.pull.uncons1.flatMap {
       case None =>
@@ -230,14 +229,14 @@ object JRpcConsoleCodec {
     val jsonStr = msg.asJson.deepDropNullValues.noSpaces
     val lines =
       s"Content-Length: ${jsonStr.length}" ::
-      cond(
-        includeContentType,
-        "Content-Type: application/vscode-jsonrpc; charset=utf-8"
-      ) ::: (
-        "" ::
-        jsonStr ::
-        Nil
-      )
+        cond(
+          includeContentType,
+          "Content-Type: application/vscode-jsonrpc; charset=utf-8"
+        ) ::: (
+          "" ::
+            jsonStr ::
+            Nil
+        )
 
     windowsLines(lines*)
 

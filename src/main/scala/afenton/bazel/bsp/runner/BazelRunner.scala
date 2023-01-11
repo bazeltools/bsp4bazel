@@ -83,20 +83,29 @@ object BazelRunner:
           .getOrElse(Default)
       }
 
-  def default(workspaceRoot: Path, bazelWrapper: BazelWrapper, logger: Logger): BazelRunner =
+  def default(
+      workspaceRoot: Path,
+      bazelWrapper: BazelWrapper,
+      logger: Logger
+  ): BazelRunner =
     BazelRunnerImpl(workspaceRoot, bazelWrapper, logger)
 
-  private case class BazelRunnerImpl(workspaceRoot: Path, bazelWrapper: BazelWrapper, logger: Logger)
-      extends BazelRunner:
+  private case class BazelRunnerImpl(
+      workspaceRoot: Path,
+      bazelWrapper: BazelWrapper,
+      logger: Logger
+  ) extends BazelRunner:
 
     private def runBazel(
         command: Command,
         expr: Option[String]
     ): Resource[IO, ExecutionResult] =
       for
-        _ <- Resource.eval(logger.info(
-          s"Running ${bazelWrapper.command} ${command.asString} ${expr.getOrElse("_no_args_")}"
-        ))
+        _ <- Resource.eval(
+          logger.info(
+            s"Running ${bazelWrapper.command} ${command.asString} ${expr.getOrElse("_no_args_")}"
+          )
+        )
         er <- SubProcess
           .from(
             workspaceRoot,
@@ -107,7 +116,10 @@ object BazelRunner:
         _ <- Resource.eval(logger.info(s"Exited with ${er.exitCode}"))
       yield er
 
-    private def runBazelOk(command: Command, expr: Option[String]): Resource[IO, ExecutionResult] =
+    private def runBazelOk(
+        command: Command,
+        expr: Option[String]
+    ): Resource[IO, ExecutionResult] =
       for
         er <- runBazel(command, expr)
         _ <- Resource.eval(BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok))
@@ -176,18 +188,19 @@ object BazelRunner:
         .eval {
           runBazel(Command.Build, label.allRulesResursive)
             .use { er =>
-              BazelRunner.raiseIfUnxpectedExit(
-                er,
-                ExitCode.Ok,
-                ExitCode.BuildFailed
-              )
-              .as(er.exitCode)
+              BazelRunner
+                .raiseIfUnxpectedExit(
+                  er,
+                  ExitCode.Ok,
+                  ExitCode.BuildFailed
+                )
+                .as(er.exitCode)
             }
         }
         .flatMap { exitCode =>
           ExitCode.fromCode(exitCode) match
             case ExitCode.BuildFailed => diagnostics
-            case _ => Stream.empty
+            case _                    => Stream.empty
         }
 
   end BazelRunnerImpl
