@@ -21,10 +21,16 @@ object Logger:
     def error(msgs: => String): IO[Unit] = IO.unit
   }
 
-  def queue(size: Int, out: Pipe[IO, String, Unit], verbose: Boolean): IO[(Logger, Stream[IO, Unit])] =
-    Queue.bounded[IO, () => String](size)
+  def queue(
+      size: Int,
+      out: Pipe[IO, String, Unit],
+      verbose: Boolean
+  ): IO[(Logger, Stream[IO, Unit])] =
+    Queue
+      .bounded[IO, () => String](size)
       .map { errQ =>
-        val logger = if verbose then QueueVerboseLogger(errQ) else QueueQuietLogger(errQ)
+        val logger =
+          if verbose then QueueVerboseLogger(errQ) else QueueQuietLogger(errQ)
 
         val resStream = Stream
           .fromQueueUnterminated(errQ, size)
@@ -33,7 +39,11 @@ object Logger:
         (logger, resStream)
       }
 
-  private inline def fmt(inline level: String, inline color: String, msgs: String) =
+  private inline def fmt(
+      inline level: String,
+      inline color: String,
+      msgs: String
+  ) =
     val withVisibleLineEndings = msgs.replace("\r\n", "[CRLF]\n")
 
     s"[${color}${level}${AnsiColor.RESET}] ${color}${withVisibleLineEndings}${AnsiColor.RESET}"
@@ -45,7 +55,8 @@ object Logger:
       case Logger.Level.Error => fmt("error", AnsiColor.RED, msgs)
     }
 
-  private class QueueVerboseLogger(errQ: QueueSink[IO, () => String]) extends Logger:
+  private class QueueVerboseLogger(errQ: QueueSink[IO, () => String])
+      extends Logger:
     def trace(msgs: => String): IO[Unit] =
       errQ.offer(() => format(Logger.Level.Trace, msgs))
 
@@ -55,7 +66,8 @@ object Logger:
     def error(msgs: => String): IO[Unit] =
       errQ.offer(() => format(Logger.Level.Error, msgs))
 
-  private class QueueQuietLogger(errQ: QueueSink[IO, () => String]) extends Logger:
+  private class QueueQuietLogger(errQ: QueueSink[IO, () => String])
+      extends Logger:
     def trace(msgs: => String): IO[Unit] = IO.unit
 
     def info(msgs: => String): IO[Unit] =

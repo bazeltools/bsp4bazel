@@ -1,7 +1,7 @@
 package afenton.bazel.bsp.jrpc
 
 import cats.parse.{Numbers, Parser => P, Parser0 => P0, strings}
-import io.circe.{Json, JsonObject, JsonNumber}
+import io.circe.{Json, JsonNumber, JsonObject}
 
 // NB: Why have a custom parser, instead of using Circe? Because we need support for partially parsing a string into Json, and leaving
 // the rest in the buffer.
@@ -42,11 +42,16 @@ object JsonParser:
       .map(Json.fromValues(_))
 
     val kv: P[(String, Json)] =
-      strings.Json.delimited.parser ~ ((whitespaces0.with1 ~ P.char(':') ~ whitespaces0) *> recurse)
+      strings.Json.delimited.parser ~ ((whitespaces0.with1 ~ P.char(
+        ':'
+      ) ~ whitespaces0) *> recurse)
 
     val obj: P[JsonObject] = (P.char('{') *> rep(kv) <* P.char('}'))
       .map(JsonObject.fromIterable(_))
 
     val anyJson: P[Json] =
-      P.oneOf(pnull :: bool :: num.map(Json.fromJsonNumber(_)) :: str :: list :: obj.map(Json.fromJsonObject(_)) :: Nil)
+      P.oneOf(
+        pnull :: bool :: num.map(Json.fromJsonNumber(_)) :: str :: list :: obj
+          .map(Json.fromJsonObject(_)) :: Nil
+      )
   }

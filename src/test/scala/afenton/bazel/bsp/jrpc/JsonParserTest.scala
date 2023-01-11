@@ -1,7 +1,7 @@
 package afenton.bazel.bsp.jrpc
 
 import cats.syntax.all.*
-import io.circe.{Json, JsonObject, JsonNumber}
+import io.circe.{Json, JsonNumber, JsonObject}
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -17,7 +17,8 @@ class JsonParserTest extends ScalaCheckSuite:
     case Right(t)  => assertEquals(t, expected)
   }
 
-  def num(str: String): Json = Json.fromJsonNumber(JsonNumber.fromDecimalStringUnsafe(str))
+  def num(str: String): Json =
+    Json.fromJsonNumber(JsonNumber.fromDecimalStringUnsafe(str))
 
   test("should handle Json numbers") {
     // NB: In Json, numbers with fractional values must have digits before the decimal point
@@ -46,9 +47,9 @@ class JsonParserTest extends ScalaCheckSuite:
     assertParsesAndEqual(
       result,
       JsonObject(
-          "escaped" -> Json.fromString("\"\b\t\r\n\\"),
-          "unicode" -> Json.fromString(
-            "\u6211\u662F\u5730\u7403\uD83C\uDF0D"
+        "escaped" -> Json.fromString("\"\b\t\r\n\\"),
+        "unicode" -> Json.fromString(
+          "\u6211\u662F\u5730\u7403\uD83C\uDF0D"
         )
       )
     )
@@ -72,7 +73,6 @@ class JsonParserTest extends ScalaCheckSuite:
       }
     }
   }
-
 
 object GenJson:
 

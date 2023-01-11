@@ -113,25 +113,28 @@ case class SubProcess(
     }
 
   def start: Resource[IO, RunningProcess] =
-    Resource.make {
-      for
-        pb <- mkEnvironment
-        process = pb.start()
-      yield process
-    } { process =>
-      IO.interruptibleMany(process.destroy())
-    }
-    .map(RunningProcess(_))
+    Resource
+      .make {
+        for
+          pb <- mkEnvironment
+          process = pb.start()
+        yield process
+      } { process =>
+        IO.interruptibleMany(process.destroy())
+      }
+      .map(RunningProcess(_))
 
   def runUntilExit(duration: Duration): Resource[IO, ExecutionResult] =
     for
       pb <- Resource.eval(mkEnvironment)
       files <- redirectToTmp(pb)
       (stdout, stderr) = files
-      exitCode <- Resource.eval(IO.interruptibleMany {
-        val process: Process = pb.start()
-        process.waitFor()
-      }.timeout(duration))
+      exitCode <- Resource.eval(
+        IO.interruptibleMany {
+          val process: Process = pb.start()
+          process.waitFor()
+        }.timeout(duration)
+      )
     yield SubProcess.FileExecutionResult(
       workingDirectory = workingDirectory,
       exitCode = exitCode,
@@ -152,12 +155,14 @@ object SubProcess:
       stderrPath: Path
   ) extends ExecutionResult {
     def stdoutLines: Stream[IO, String] =
-      fs2Files[IO].readAll(fs2Path.fromNioPath(stdoutPath))
+      fs2Files[IO]
+        .readAll(fs2Path.fromNioPath(stdoutPath))
         .through(fs2.text.utf8.decode)
         .through(fs2.text.lines)
 
     def stderrLines: Stream[IO, String] =
-      fs2Files[IO].readAll(fs2Path.fromNioPath(stderrPath))
+      fs2Files[IO]
+        .readAll(fs2Path.fromNioPath(stderrPath))
         .through(fs2.text.utf8.decode)
         .through(fs2.text.lines)
   }

@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
-  // Long, because Github actions can run slooooow at times 
+  // Long, because Github actions can run slooooow at times
   override val munitTimeout = 10.minute
 
   val projectRoot = Paths.get("").toAbsolutePath
@@ -44,8 +44,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
     .test("should successfully initialize") { (root, bazel) =>
 
-      val (responses, notifications) = Lsp.start
-        .shutdown
+      val (responses, notifications) = Lsp.start.shutdown
         .runIn(root)
         .unsafeRunSync()
 
