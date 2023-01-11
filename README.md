@@ -31,14 +31,14 @@ http_archive(
     url = "https://github.com/aishfenton/bazel-bsp/releases/download/{}/bazel_rules.tar.gz" % bazel_bsp_version,
 )
 
-load("@bazel-bsp-rules//bazel_rules:bazel_bsp_setup.bzl", "bazel_bsp_setup")
+load("@bazel-bsp-rules//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
 bazel_bsp_setup()
 ```
 
 And finally add at least one bsp target (although you can add as many as you like) to specify a project to build. To add a bsp target place a `bsp_target` rule in the `BUILD` files, as so:
 
 ```starlark
-load("@bazel-bsp-rules//bazel_rules:bsp_target.bzl", "bsp_target")
+load("@bazel-bsp-rules//:bsp_target.bzl", "bsp_target")
 
 bsp_target(
     name = "--> a unique name for the bsp target",
