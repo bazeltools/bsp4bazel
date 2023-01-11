@@ -2,11 +2,10 @@
 
 import scala.util.matching.Regex
 
-private def join(l1: String, l2: String): String =
+def join(l1: String, l2: String): String =
   if l1.isEmpty then l2
   else s"$l1\n$l2"
 
-// Substitutes bazel_rule SHA into README
 def substituteReadme(readmeContent: String, newSha: String): String =
   sed(readmeContent, "sha256 =".r, s"\"[a-f0-9]{64}\"".r, s"\"$newSha\"") match
     case Some(c) => c
@@ -15,7 +14,6 @@ def substituteReadme(readmeContent: String, newSha: String): String =
         s"No substitutions made in README.md, with content: $readmeContent"
       )
 
-// Substitutes new SHA defintions into Python
 def substituteBazelRule(
     ruleContent: String,
     newDefinitions: String
@@ -76,25 +74,13 @@ def generatePythonMap(artifacts: Map[String, String]): String =
     "}"
   ).mkString("\n")
 
-private def binEntries(map: Map[String, String]): Map[String, String] =
-  map.filterKeys(_.contains("bazel-bsp")).toMap
-
-def updateArtifactShas(
-    bazelRuleFile: String,
-    readmeFile: String,
-    artifactDir: String,
-    cwd: os.Path,
-    console: Console
+def updateFile(
+    filePath: os.Path,
+    artifactPath: os.Path,
+    fn: (String, Map[String, String]) => String
 ): Unit =
-
-  val bazelRulePath = os.Path(bazelRuleFile, cwd)
-  val readmePath = os.Path(readmeFile, cwd)
-  val artifactPath = os.Path(artifactDir, cwd)
-
+  require(os.exists(filePath), s"$filePath wasn't found")
   require(os.isDir(artifactPath), s"${artifactPath} is not a directory")
-  List(bazelRulePath, readmePath).foreach { f =>
-    require(os.exists(f), s"$f file wasn't found")
-  }
 
   val artifactShas: Map[String, String] = os
     .list(artifactPath)
@@ -102,35 +88,42 @@ def updateArtifactShas(
     .map(a => (a.last, os.read(a).trim))
     .toMap
 
-  val newRule = substituteBazelRule(
-    os.read(bazelRulePath),
-    generatePythonMap(binEntries(artifactShas))
-  )
+  require(!artifactShas.isEmpty, s"No artifacts SHAs found at $artifactPath")
 
-  println(s"Writing new $bazelRulePath")
-  os.write.over(bazelRulePath, newRule)
+  val newContent = fn(os.read(filePath), artifactShas)
 
-  val newReadme = substituteReadme(
-    os.read(readmePath),
-    artifactShas("bazel_rules.tar.gz.sha256")
-  )
+  println(s"Writing new $filePath")
+  os.write.over(filePath, newContent)
 
-  println(s"Writing new $readmePath")
-  os.write.over(readmePath, newReadme)
-
-/** Update the given inputFile with the SHA256 of the artifacts in artifactDir.
-  * And print to stdout.
+/** Update bazee_rule.tar.gz artifcat SHA in README.md.
   *
-  * @param bazelRuleFile
-  *   The bazel_rule file to update
-  * @param readmeFile
-  *   The README file to update
   * @param artifactDir
   *   The directory where artifacts are stored
   */
-@main def updateArtifactShas(
-    bazelRuleFile: String,
-    readmeFile: String,
-    artifactDir: String
-): Unit =
-  runWith(updateArtifactShas(bazelRuleFile, readmeFile, artifactDir, _, _))
+@main def updateReadme(artifactDir: String): Unit =
+  val artifactPath = os.Path(artifactDir, os.pwd)
+
+  updateFile(
+    os.pwd / "README.md",
+    artifactPath,
+    (content, artifacts) =>
+      substituteReadme(content, artifacts("bazel_rules.tar.gz.sha256"))
+  )
+
+def binEntries(map: Map[String, String]): Map[String, String] =
+  map.filterKeys(_.contains("bazel-bsp")).toMap
+
+/** Update bin artifact SHA's in bazel_rules.
+  *
+  * @param artifactDir
+  *   The directory where artifacts are stored
+  */
+@main def updateBazelRule(artifactDir: String): Unit =
+  val artifactPath = os.Path(artifactDir, os.pwd)
+
+  updateFile(
+    os.pwd / "bazel_rules" / "bazel_bsp_setup.bzl",
+    artifactPath,
+    (content, artifacts) => substituteBazelRule(content, generatePythonMap(binEntries(artifacts)))
+  )
+
