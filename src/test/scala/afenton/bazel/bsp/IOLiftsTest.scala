@@ -1,6 +1,6 @@
 package afenton.bazel.bsp
 
-import IOLifts.{fromOption, asIO}
+import IOLifts.{asIO, fromOption}
 
 class IOLiftsTest extends munit.CatsEffectSuite {
   test("fromOption(Some(x))") {
@@ -12,23 +12,21 @@ class IOLiftsTest extends munit.CatsEffectSuite {
   }
 
   test("fromOption(None)") {
-    fromOption(None)
-      .attempt
+    fromOption(None).attempt
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
-          e.getMessage.contains("IOLiftsTest.scala") &&
-          e.getMessage.contains("line: 15")
+        e.getMessage.contains("IOLiftsTest.scala") &&
+        e.getMessage.contains("line: 15")
       })
       .assertEquals(Left(true))
   }
 
   test("fromOption(Option(null))") {
-    fromOption(Option(null))
-      .attempt
+    fromOption(Option(null)).attempt
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
-          e.getMessage.contains("IOLiftsTest.scala") &&
-          e.getMessage.contains("line: 26")
+        e.getMessage.contains("IOLiftsTest.scala") &&
+        e.getMessage.contains("line: 26")
       })
       .assertEquals(Left(true))
   }
@@ -39,12 +37,11 @@ class IOLiftsTest extends munit.CatsEffectSuite {
   }
 
   test("{ val x: Option[Int] = None; fromOption(x) }") {
-      { val x: Option[Int] = None; fromOption(x) }
-      .attempt
+    { val x: Option[Int] = None; fromOption(x) }.attempt
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
-          e.getMessage.contains("IOLiftsTest.scala") &&
-          e.getMessage.contains("line: 42")
+        e.getMessage.contains("IOLiftsTest.scala") &&
+        e.getMessage.contains("line: 42")
       })
       .assertEquals(Left(true))
   }
@@ -58,12 +55,11 @@ class IOLiftsTest extends munit.CatsEffectSuite {
   }
 
   test("None.asIO") {
-    None.asIO
-      .attempt
+    None.asIO.attempt
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
-          e.getMessage.contains("IOLiftsTest.scala") &&
-          e.getMessage.contains("line: 61")
+        e.getMessage.contains("IOLiftsTest.scala") &&
+        e.getMessage.contains("line: 61")
       })
       .assertEquals(Left(true))
   }
