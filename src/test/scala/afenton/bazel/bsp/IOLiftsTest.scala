@@ -26,7 +26,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 26")
+        e.getMessage.contains("line: 25")
       })
       .assertEquals(Left(true))
   }
@@ -41,7 +41,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 42")
+        e.getMessage.contains("line: 40")
       })
       .assertEquals(Left(true))
   }
@@ -59,7 +59,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 61")
+        e.getMessage.contains("line: 58")
       })
       .assertEquals(Left(true))
   }
