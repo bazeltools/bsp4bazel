@@ -1,10 +1,10 @@
 load("//private:load_tool.bzl", "load_tool")
 
 # <--- Updated automatically by release job
-_bazel_bsp_version = "0.0.24"
+_bazel_bsp_version = "0.0.25"
 _build_artifact_shas = {
-    "linux-x86": "b5c7340729dc63f8823396cfab7f818e9e12537d0d9ece6f79427af6921203f8",
-    "macos-x86": "f5fcda41a59ffe712b2dd32d498c5b8e4992b379ffef82b9741ede1e1c26c4ad"
+    "linux-x86": "f79bf65d84d98b55190f1420d2487fd3dcef44d0120dfdb6b0171113d197d382",
+    "macos-x86": "d794e4fd7aeaf88ac9ce30c3390c20fa14c3f76783f57204ddd994ac20ae3932"
 }
 # --->
 
