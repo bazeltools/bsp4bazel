@@ -62,7 +62,7 @@ jobs:
           ./.github/ci_scripts/update.sh ${{ inputs.version }} 
       - name: Run native image
         run: |
-          sbt graalvm-native-image:packageBin
+          sbt clean compile graalvm-native-image:packageBin
       # Generate a SHA256, and move both files into stagging dir
       - name: Prepare output
         run: |
