@@ -70,35 +70,3 @@ def sed(
 
   if didReplace then Some(lines.mkString("\n")) else None
 
-trait Console:
-  def print(s: String): Unit
-  def println(s: String): Unit
-  def error(s: String): Unit
-  def errorln(s: String): Unit
-
-  def outLines: List[String]
-  def errLines: List[String]
-
-  def printOuts: Unit = System.out.print(outLines.mkString)
-  def printErrs: Unit = System.err.print(errLines.mkString)
-
-object Console:
-  def default: Console = new ConsoleImpl
-
-  private class ConsoleImpl extends Console:
-    private val outBuffer: ListBuffer[String] = ListBuffer.empty
-    private val errBuffer: ListBuffer[String] = ListBuffer.empty
-
-    def print(str: String): Unit = outBuffer.append(str)
-    def println(str: String): Unit = outBuffer.append(s"$str\n")
-    def error(str: String): Unit = errBuffer.append(str)
-    def errorln(str: String): Unit = errBuffer.append(s"$str\n")
-
-    def outLines: List[String] = outBuffer.toList
-    def errLines: List[String] = errBuffer.toList
-
-def runWith[A](fn: (os.Path, Console) => Unit): Unit =
-  val console = Console.default
-  fn(os.pwd, console)
-  console.printOuts
-  console.printErrs

@@ -11,22 +11,19 @@ def extractVersion(buildContent: String): Option[SemVer] =
       SemVer(major.toInt, minor.toInt, patch.toInt)
     }
 
-def currentVersion(buildFile: String, cwd: os.Path, console: Console): Unit =
-
-  val buildPath = os.Path(buildFile, cwd)
-  require(os.exists(buildPath), s"$buildPath file wasn't found")
-
-  val content = os.read(buildPath)
-  extractVersion(content) match
-    case Some(semVer) => 
-      console.println(semVer.asString) 
-    case None =>
-      throw new Exception(s"Didn't find version in build file: $content")
-
 /** Return the current version number from the build file
   *
   * @param buildFile
   *   Path to build.sbt
   */
 @main def currentVersion(buildFile: String): Unit =
-  runWith(currentVersion(buildFile, _, _))
+
+  val buildPath = os.Path(buildFile, os.pwd)
+  require(os.exists(buildPath), s"$buildPath file wasn't found")
+
+  val content = os.read(buildPath)
+  extractVersion(content) match
+    case Some(semVer) => 
+      println(semVer.asString) 
+    case None =>
+      throw new Exception(s"Didn't find version in build file: $content")
