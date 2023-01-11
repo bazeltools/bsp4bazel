@@ -42,7 +42,7 @@ jobs:
       # Update version in build.sbt first, as that gets backed into the native-image (via sbt-buildinfo)
       - name: Update version and build native image
         run: | 
-          scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bazelBspVersion" ${{ matrix.artifact }}
+          scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bazelBspVersion" ${{ inputs.version }}
           sbt clean compile graalvm-native-image:packageBin
           ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging ${{ matrix.artifact }} 
       - name: Upload binary
@@ -73,7 +73,7 @@ jobs:
       # Update versions, and shas, in files
       - name: Update versions, and shas
         run: |
-          ./.github/ci_scripts/update_all.sh ${{ matrix.artifact }} 
+          ./.github/ci_scripts/update_all.sh ${{ inputs.version }} 
       # Push changes back to master 
       - name: Commit updates
         working-directory: "repo"
