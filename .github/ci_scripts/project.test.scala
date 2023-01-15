@@ -41,8 +41,7 @@ lazy dog
 A quick brown fox
 jumping over the 
 lazy dog
-    """.trim
-      )
+    """.trim)
     )
 
     val result2 = sed(lines, "not-there".r, "ed".r, "ing")

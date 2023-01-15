@@ -124,6 +124,6 @@ def binEntries(map: Map[String, String]): Map[String, String] =
   updateFile(
     os.pwd / "bazel_rules" / "bazel_bsp_setup.bzl",
     artifactPath,
-    (content, artifacts) => substituteBazelRule(content, generatePythonMap(binEntries(artifacts)))
+    (content, artifacts) =>
+      substituteBazelRule(content, generatePythonMap(binEntries(artifacts)))
   )
-

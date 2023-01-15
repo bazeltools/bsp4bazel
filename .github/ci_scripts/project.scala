@@ -69,4 +69,3 @@ def sed(
     i += 1
 
   if didReplace then Some(lines.mkString("\n")) else None
-
