@@ -12,7 +12,7 @@ lazy val root = project
   .settings(
     name := "bazel-bsp",
     organization := "afenton",
-    version := bazelBspVersion, 
+    version := bazelBspVersion,
     scalaVersion := scala3Version,
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.4.4",
     libraryDependencies += "co.fs2" %% "fs2-core" % "3.4.0",

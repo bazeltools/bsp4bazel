@@ -4,7 +4,7 @@ class WorkflowTest extends munit.FunSuite:
 
   val files = FunFixture[os.Path](
     setup = { test =>
-      val projectDir = os.pwd 
+      val projectDir = os.pwd
       val tmpDir = os.temp.dir()
 
       println("Using project dir: " + projectDir)
@@ -15,7 +15,10 @@ class WorkflowTest extends munit.FunSuite:
       os.makeDir(tmpDir / "repo" / "bazel_rules")
       os.makeDir(tmpDir / "repo" / ".github")
 
-      os.copy(projectDir / ".github" / "ci_scripts", tmpDir / "repo" / ".github" / "ci_scripts")
+      os.copy(
+        projectDir / ".github" / "ci_scripts",
+        tmpDir / "repo" / ".github" / "ci_scripts"
+      )
 
       os.write.over(tmpDir / "repo" / "README.md", FixtureData.Readme)
       os.write.over(
@@ -35,7 +38,7 @@ class WorkflowTest extends munit.FunSuite:
     }
   )
 
-  files.test("should update versions and shas") { cwd  =>
+  files.test("should update versions and shas") { cwd =>
 
     val workingDir = cwd / "repo"
 
@@ -129,7 +132,7 @@ object FixtureData:
 
   val ArtifactShas: Map[String, String] = Map(
     "bazel-bsp-linux-x86.sha256" -> "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
-    "bazel-bsp-macos-x86.sha256" -> "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f",
+    "bazel-bsp-macos-x86.sha256" -> "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f"
   )
 
   val BazelRule = raw"""

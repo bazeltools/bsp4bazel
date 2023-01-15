@@ -23,7 +23,7 @@ def extractVersion(buildContent: String): Option[SemVer] =
 
   val content = os.read(buildPath)
   extractVersion(content) match
-    case Some(semVer) => 
-      println(semVer.asString) 
+    case Some(semVer) =>
+      println(semVer.asString)
     case None =>
       throw new Exception(s"Didn't find version in build file: $content")
