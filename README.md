@@ -50,7 +50,7 @@ bsp_target(
 
 - [x] Compile provider
 - [x] Make Bazel setup more straight forward
-- [ ] Generate SemanticDB files ([related](https://github.com/bazelbuild/rules_scala/issues/952))
+- [ ] Generate SemanticDB files ([related](https://github.com/bazelbuild/rules_scala/pull/1467))
 - [ ] Test provider
 - [ ] Run provider
 - [ ] Debug provider
