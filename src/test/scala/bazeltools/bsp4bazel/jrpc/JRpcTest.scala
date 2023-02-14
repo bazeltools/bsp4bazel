@@ -15,7 +15,12 @@ import bazeltools.bsp4bazel.Logger
 
 import bazeltools.bsp4bazel.jrpc.GenJson
 
-import bazeltools.bsp4bazel.jrpc.{Request, Response, jRpcParser, JRpcConsoleCodec}
+import bazeltools.bsp4bazel.jrpc.{
+  JRpcConsoleCodec,
+  Request,
+  Response,
+  jRpcParser
+}
 
 class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite:
 

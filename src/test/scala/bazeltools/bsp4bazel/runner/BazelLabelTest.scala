@@ -3,7 +3,7 @@ package bazeltools.bsp4bazel.runner
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
-import bazeltools.bsp4bazel.runner.{BazelTarget, BPath, BazelLabel}
+import bazeltools.bsp4bazel.runner.{BPath, BazelLabel, BazelTarget}
 class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
 
   test("should create BazelTargets from strings") {
