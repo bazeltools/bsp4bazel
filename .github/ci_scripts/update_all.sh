@@ -12,7 +12,7 @@ echo "Current version is $CURRENT_VERSION"
 
 # Update versions in files
 scala-cli $SCRIPT_DIR/updateVersion.scala -- README.md "[0-9]+\.[0.9]+\.[0-9]+" $RELEASE 
-scala-cli $SCRIPT_DIR/updateVersion.scala -- build.sbt "^val bazelBspVersion" $RELEASE 
+scala-cli $SCRIPT_DIR/updateVersion.scala -- build.sbt "^val bsp4BazelVersion" $RELEASE 
 scala-cli $SCRIPT_DIR/updateVersion.scala -- bazel_rules/bsp4bazel_setup.bzl "^_bsp4bazel_version" $RELEASE  
 
 # Update artifact SHAs in bazel rule

@@ -15,7 +15,9 @@ import bazeltools.bsp4bazel.Logger
 
 import bazeltools.bsp4bazel.jrpc.GenJson
 
-import bazeltools.bsp4bazel.jrpc.{Request, Response, jRpcParser, JRpcConsoleCodec}class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite:
+import bazeltools.bsp4bazel.jrpc.{Request, Response, jRpcParser, JRpcConsoleCodec}
+
+class JRpcTest extends munit.CatsEffectSuite with ScalaCheckSuite:
 
   val noLog = Logger.noOp
 

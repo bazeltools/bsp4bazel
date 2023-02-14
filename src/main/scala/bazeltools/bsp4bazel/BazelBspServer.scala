@@ -26,10 +26,10 @@ import IOLifts.{asIO, mapToIO}
 import bazeltools.bsp4bazel.IOLifts
 import bazeltools.bsp4bazel.Logger
 
-class BazelBspServer(
+class Bsp4BazelServer(
     client: BspClient,
     logger: Logger,
-    stateRef: Ref[IO, BazelBspServer.ServerState],
+    stateRef: Ref[IO, Bsp4BazelServer.ServerState],
     val exitSignal: Deferred[IO, Either[Throwable, Unit]]
 ) extends BspServer(client):
 
@@ -77,7 +77,7 @@ class BazelBspServer(
         )
       }
       _ <- stateRef.update(s =>
-        s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts))
+        s.copy(targetSourceMap = Bsp4BazelServer.TargetSourceMap(ts))
       )
     yield ()
 
@@ -324,12 +324,12 @@ class BazelBspServer(
     for _ <- logger.info("$/cancelRequest")
     yield ()
 
-end BazelBspServer
+end Bsp4BazelServer
 
-object BazelBspServer:
+object Bsp4BazelServer:
 
   case class ServerState(
-      targetSourceMap: BazelBspServer.TargetSourceMap,
+      targetSourceMap: Bsp4BazelServer.TargetSourceMap,
       currentErrors: List[FileDiagnostics],
       workspaceRoot: Option[Path],
       bazelRunner: Option[BazelRunner],
@@ -337,13 +337,13 @@ object BazelBspServer:
   )
 
   def defaultState: ServerState =
-    ServerState(BazelBspServer.TargetSourceMap.empty, Nil, None, None, Nil)
+    ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, Nil)
 
-  def create(client: BspClient, logger: Logger): IO[BazelBspServer] =
+  def create(client: BspClient, logger: Logger): IO[Bsp4BazelServer] =
     for
       exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
-      stateRef <- Ref.of[IO, BazelBspServer.ServerState](defaultState)
-    yield BazelBspServer(client, logger, stateRef, exitSwitch)
+      stateRef <- Ref.of[IO, Bsp4BazelServer.ServerState](defaultState)
+    yield Bsp4BazelServer(client, logger, stateRef, exitSwitch)
 
   protected case class TargetSourceMap(
       val _targetSources: Map[BuildTargetIdentifier, List[

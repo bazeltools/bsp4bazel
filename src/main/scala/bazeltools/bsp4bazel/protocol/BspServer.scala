@@ -1,6 +1,6 @@
 package bazeltools.bsp4bazel.protocol
 
-import afebazeltoolsnton.bsp4bazel.jrpc.RpcFunction
+import bazeltools.bsp4bazel.jrpc.RpcFunction
 import cats.effect.IO
 
 import java.net.URI

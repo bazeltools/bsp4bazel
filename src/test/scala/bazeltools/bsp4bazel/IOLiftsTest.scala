@@ -3,6 +3,7 @@ package bazeltools.bsp4bazel
 import IOLifts.{asIO, fromOption}
 
 import bazeltools.bsp4bazel.IOLifts
+
 class IOLiftsTest extends munit.CatsEffectSuite {
   test("fromOption(Some(x))") {
     fromOption(Some(1)).assertEquals(1)
@@ -17,7 +18,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 15")
+        e.getMessage.contains("line: 17")
       })
       .assertEquals(Left(true))
   }
@@ -27,7 +28,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 25")
+        e.getMessage.contains("line: 27")
       })
       .assertEquals(Left(true))
   }
@@ -42,7 +43,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 40")
+        e.getMessage.contains("line: 42")
       })
       .assertEquals(Left(true))
   }
@@ -60,7 +61,7 @@ class IOLiftsTest extends munit.CatsEffectSuite {
       .map(_.left.map { e =>
         e.isInstanceOf[java.util.NoSuchElementException] &&
         e.getMessage.contains("IOLiftsTest.scala") &&
-        e.getMessage.contains("line: 58")
+        e.getMessage.contains("line: 60")
       })
       .assertEquals(Left(true))
   }

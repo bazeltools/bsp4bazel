@@ -1,6 +1,5 @@
 package bazeltools.bsp4bazel
 
-import bazeltools.bazel.bsp.Lsp.Action
 import bazeltools.bsp4bazel.jrpc.JRpcConsoleCodec
 import bazeltools.bsp4bazel.jrpc.Message
 import bazeltools.bsp4bazel.jrpc.Notification
@@ -35,9 +34,9 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration.FiniteDuration
 
-import bazeltools.bazel.bsp.IOLifts.{asIO, mapToIO}
+import bazeltools.bsp4bazel.IOLifts.{asIO, mapToIO}
 
-import bazeltools.bsp4bazel.BazelBspApp
+import bazeltools.bsp4bazel.Bsp4BazelApp
 import bazeltools.bsp4bazel.IOLifts
 import bazeltools.bsp4bazel.Logger
 type OpenRequests = Map[String, Deferred[IO, Response]]
@@ -210,9 +209,9 @@ case class LspTestProcess(workspaceRoot: Path):
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[InitializeBuildResult | Unit]] =
     actions.traverse {
-      case Action.Start           => start(client)
-      case Action.Shutdown        => shutdown(client, exitSwitch)
-      case Action.Compile(target) => compile(client, target)
+      case Lsp.Action.Start           => start(client)
+      case Lsp.Action.Shutdown        => shutdown(client, exitSwitch)
+      case Lsp.Action.Compile(target) => compile(client, target)
     }
 
   def runIn(
@@ -222,7 +221,7 @@ case class LspTestProcess(workspaceRoot: Path):
       bspOutQ <- Queue.bounded[IO, String](1_000)
       bspErrQ <- Queue.bounded[IO, String](1_000)
       bspInQ <- Queue.bounded[IO, String](1_000)
-      bspServer = BazelBspApp.server(true)(
+      bspServer = Bsp4BazelApp.server(true)(
         Stream.fromQueueUnterminated(bspInQ),
         pipeInto(bspOutQ),
         pipeInto(bspErrQ)

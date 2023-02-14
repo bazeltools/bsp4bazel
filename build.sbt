@@ -44,5 +44,5 @@ lazy val root = project
       sbtVersion,
       "bspVersion" -> "2.0.0-M2"
     ),
-    buildInfoPackage := "bazeltools.bazel.bsp"
+    buildInfoPackage := "bazeltools.bsp4bazel"
   )

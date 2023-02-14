@@ -49,6 +49,8 @@ object BazelRunner:
     def fromCode(code: Int): ExitCode = code match
       case 0 => ExitCode.Ok
       case 1 => ExitCode.BuildFailed
+      case code =>
+        throw new Exception(s"Bazel failed to run. Exited with code $code")
 
   enum Command(val asString: String):
     case Query extends Command("query")

@@ -24,7 +24,9 @@ import scala.concurrent.duration._
 import bazeltools.bsp4bazel.BspHelpers
 import bazeltools.bsp4bazel.Lsp
 
-import bazeltools.bsp4bazel.Loggerclass End2EndTest extends munit.CatsEffectSuite with BspHelpers:
+import bazeltools.bsp4bazel.Logger
+
+class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
   // Long, because Github actions can run slooooow at times
   override val munitTimeout = 10.minute

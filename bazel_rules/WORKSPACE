@@ -1,4 +1,4 @@
 workspace(name = "bsp4bazel-rules")
 
 load("//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
-bsp4bazel_setup()
+# bsp4bazel_setup()

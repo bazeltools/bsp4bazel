@@ -35,12 +35,12 @@ import scala.concurrent.duration.FiniteDuration
 import java.util.concurrent.TimeUnit
 import cats.effect.kernel.Deferred
 
-import bazeltools.bsp4bazel.BazelBspServer
+import bazeltools.bsp4bazel.Bsp4BazelServer
 import bazeltools.bsp4bazel.FilesIO
 import bazeltools.bsp4bazel.Logger
 import bazeltools.bsp4bazel.Verifier
 
-object BazelBspApp
+object Bsp4BazelApp
     extends CommandIOApp(
       name = "bsp4bazel",
       header = "Bsp 4 Bazel Server",
@@ -128,7 +128,7 @@ object BazelBspApp
 
   private lazy val bspConfig: String = s"""
 {
-    "name": "BazelBsp",
+    "name": "Bsp4Bazel",
     "version": "${BuildInfo.version}",
     "bspVersion": "${BuildInfo.bspVersion}",
     "languages": [
@@ -176,7 +176,7 @@ object BazelBspApp
       (logger, logStream) = loggerStream
       outQ <- Queue.bounded[IO, Message](100)
       client = BspClient.toQueue(outQ, logger)
-      server <- BazelBspServer.create(client, logger)
+      server <- Bsp4BazelServer.create(client, logger)
       all = Stream(
         processInStream(inStream, server, outQ, logger),
         processOutStream(outPipe, outQ, logger),
