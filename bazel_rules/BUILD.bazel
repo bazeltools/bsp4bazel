@@ -1,9 +1,9 @@
 
 alias(
-    name = "bazel-bsp",
+    name = "bsp4bazel",
     actual = select({
-        "//private:macos_x86": "@bazel-bsp-macos-x86//:bin",
-        "//private:linux_x86": "@bazel-bsp-linux-x86//:bin",
+        "//private:macos_x86": "@bsp4bazel-macos-x86//:bin",
+        "//private:linux_x86": "@bsp4bazel-linux-x86//:bin",
     }),
     visibility = ["//visibility:public"],
 )

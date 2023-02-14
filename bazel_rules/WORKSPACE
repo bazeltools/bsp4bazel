@@ -1,4 +1,4 @@
-workspace(name = "bazel-bsp-rules")
+workspace(name = "bsp4bazel-rules")
 
-load("//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
-bazel_bsp_setup()
+load("//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+bsp4bazel_setup()

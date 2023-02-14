@@ -55,8 +55,8 @@ def substituteBazelRule(
 def generatePythonMap(artifacts: Map[String, String]): String =
   require(!artifacts.isEmpty, "No artifacts found")
 
-  // e.g. /my/path/to/bazel-bsp-linux-x86.sha256
-  val filePattern = raw"^bazel-bsp-([\w-]+).sha256$$".r
+  // e.g. /my/path/to/bsp4bazel-linux-x86.sha256
+  val filePattern = raw"^bsp4bazel-([\w-]+).sha256$$".r
 
   val inner = artifacts
     .map { (filename, sha) =>
@@ -111,7 +111,7 @@ def updateFile(
   )
 
 def binEntries(map: Map[String, String]): Map[String, String] =
-  map.filterKeys(_.contains("bazel-bsp")).toMap
+  map.filterKeys(_.contains("bsp4bazel")).toMap
 
 /** Update bin artifact SHA's in bazel_rules.
   *
@@ -122,7 +122,7 @@ def binEntries(map: Map[String, String]): Map[String, String] =
   val artifactPath = os.Path(artifactDir, os.pwd)
 
   updateFile(
-    os.pwd / "bazel_rules" / "bazel_bsp_setup.bzl",
+    os.pwd / "bazel_rules" / "bsp4bazel_setup.bzl",
     artifactPath,
     (content, artifacts) =>
       substituteBazelRule(content, generatePythonMap(binEntries(artifacts)))

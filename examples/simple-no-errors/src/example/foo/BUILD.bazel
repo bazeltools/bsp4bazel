@@ -1,5 +1,5 @@
 load("@io_bazel_rules_scala//scala:scala.bzl", "scala_library")
-load("@bazel-bsp-rules//:bsp_target.bzl", "bsp_target")
+load("@bsp4bazel-rules//:bsp_target.bzl", "bsp_target")
 
 scala_library(
     name = "foo",

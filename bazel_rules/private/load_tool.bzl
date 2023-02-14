@@ -1,5 +1,5 @@
 _build_file_template = """
-load("@bazel-bsp-rules//private:wrap_executable.bzl", "wrap_executable")
+load("@bsp4bazel-rules//private:wrap_executable.bzl", "wrap_executable")
 
 wrap_executable(
     name = "{name}",
