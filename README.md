@@ -1,5 +1,5 @@
-# Bazel BSP
-Current Version: [0.0.27](https://github.com/aishfenton/bazel-bsp/releases/tag/0.0.27)
+# BSP 4 Bazel
+Current Version: [0.0.27](https://github.com/bazeltools/bsp4bazel/releases/tag/0.0.27)
 
 **NOTE: This is still an alpha version. And fairly new. See TODO below for what's still msising**
 
@@ -10,7 +10,7 @@ This is a Bazel BSP Server, optimized to work with [Metals](https://scalameta.or
 Download one of the pre-built binaries, and stick it in your path. Within your Bazel project, run 
 
 ```bash
-bazel-bsp --setup
+bsp4bazel --setup
 ```
 
 This will create the nessarily `/.bsp/` config files for Metals to pick up Bazel BSP server. 
@@ -19,26 +19,26 @@ This will create the nessarily `/.bsp/` config files for Metals to pick up Bazel
 
 Setup `scala_rules` to enable diagnostic files to be written. Instructions for this can be found [here](https://github.com/bazelbuild/rules_scala/blob/master/docs/scala_toolchain.md).
 
-Add the bazel-bsp rules to your workspace
+Add the bsp4bazel rules to your workspace
 
 ```starlark
-bazel_bsp_version = "0.0.27"
+bsp4bazel_version = "0.0.27"
 http_archive(
-    name = "bazel-bsp-rules",
+    name = "bsp4bazel-rules",
     sha256 = "7697422047f4382fe230444297c70eb2be113ae5842196080f129732bede9191",
     strip_prefix = "bazel_rules",
     type = "tar.gz",
-    url = "https://github.com/aishfenton/bazel-bsp/releases/download/%s/bazel_rules.tar.gz" % bazel_bsp_version,
+    url = "https://github.com/bazeltools/bsp4bazel/releases/download/%s/bazel_rules.tar.gz" % bsp4bazel_version,
 )
 
-load("@bazel-bsp-rules//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
-bazel_bsp_setup()
+load("@bsp4bazel-rules//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+bsp4bazel_setup()
 ```
 
 And finally add at least one bsp target (although you can add as many as you like) to specify a project to build. To add a bsp target place a `bsp_target` rule in the `BUILD` files, as so:
 
 ```starlark
-load("@bazel-bsp-rules//:bsp_target.bzl", "bsp_target")
+load("@bsp4bazel-rules//:bsp_target.bzl", "bsp_target")
 
 bsp_target(
     name = "--> a unique name for the bsp target",

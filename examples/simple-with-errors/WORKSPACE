@@ -45,12 +45,12 @@ rules_proto_toolchains()
 
 register_toolchains("//toolchains:my_scala_toolchain")
 
-# Load bazel-bsp-rules
+# Load bsp4bazel-rules
 
 local_repository(
-    name = "bazel-bsp-rules",
+    name = "bsp4bazel-rules",
     path = "../../bazel_rules"
 )
 
-load("@bazel-bsp-rules//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
-bazel_bsp_setup()
+load("@bsp4bazel-rules//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+bsp4bazel_setup()

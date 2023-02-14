@@ -4,8 +4,8 @@
     "/home/nfsuper/.local/share/coursier/bin/.scala-cli.aux",
     "bsp",
     "--json-options",
-    "/vol/src/bazel-bsp/.github/ci_scripts/.scala-build/ide-options-v2.json",
-    "/vol/src/bazel-bsp/.github/ci_scripts"
+    "/vol/src/bsp4bazel/.github/ci_scripts/.scala-build/ide-options-v2.json",
+    "/vol/src/bsp4bazel/.github/ci_scripts"
   ],
   "version": "0.1.19",
   "bspVersion": "2.1.0-M3",
