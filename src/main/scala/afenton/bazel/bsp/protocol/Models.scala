@@ -50,7 +50,7 @@ case class ScalaBuilderTarget(
     scalaVersion: String,
     scalaBinaryVersion: String,
     platform: ScalaPlatform,
-    jars: List[String],
+    jars: List[URI],
     jvmBuildTarget: Option[JvmBuildTarget]
 )
 object ScalaBuilderTarget:
@@ -250,7 +250,7 @@ case class ScalacOptionsItem(
     target: BuildTargetIdentifier,
     options: List[String],
     classpath: List[String],
-    classDirectory: String
+    classDirectory: URI
 )
 object ScalacOptionsItem:
   given Encoder[ScalacOptionsItem] =

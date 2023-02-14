@@ -13,10 +13,10 @@ rules_scala_version = "c711b4d1f0d1cc386c63ef748c9df14d2f3a187e"
 
 http_archive(
     name = "io_bazel_rules_scala",
-    sha256 = "556677f505634da64efc41912d280895e61f5da109d82bdee41cde4120a190a1",
+    sha256 = "4d20d5899979fb6d4f47d1abcd919f376b978ef3709e18f68a227e8c8e43cdbe",
     strip_prefix = "rules_scala-%s" % rules_scala_version,
     type = "zip",
-    url = "https://github.com/bazelbuild/rules_scala/archive/%s.zip" % rules_scala_version,
+    url = "https://github.com/aishfenton/rules_scala/archive/%s.zip" % rules_scala_version,
 )
 
 # Stores Scala version and other configuration

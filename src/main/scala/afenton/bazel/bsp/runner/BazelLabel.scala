@@ -54,6 +54,12 @@ sealed trait BPath:
   def asPath: Path =
     Paths.get(asString)
 
+  def last: String = this match
+    case BPath.BCons(h, BNil) => h
+    case BPath.BCons(h, t)    => t.last
+    case BPath.Wildcard       => "..."
+    case BPath.BNil           => ""
+
   def asString: String = this match
     // Prevent trailing /
     case BPath.BCons(h, BNil) => s"${h}"
@@ -133,6 +139,17 @@ case class BazelLabel(
     packagePath: BPath,
     target: Option[BazelTarget]
 ):
+
+  private def packageFile(suffix: String): Path =
+    val pack = this.packagePath.withoutWildcard
+    val last = pack.last
+    pack.asPath.resolve(s"$last$suffix")
+
+  def diagnosticsFile: Path =
+    packageFile(".diagnosticsproto")
+
+  def jarFile: Path = 
+    packageFile(".jar")
 
   def withTarget(bt: BazelTarget): BazelLabel =
     copy(target = Some(bt))

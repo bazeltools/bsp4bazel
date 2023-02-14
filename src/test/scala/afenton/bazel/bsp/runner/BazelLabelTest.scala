@@ -73,6 +73,28 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
     )
   }
 
+  test("should get last part of Bazel path") {
+    assertEquals(
+      BPath.fromString("a/b/c").toTry.get.last,
+      "c"
+    )
+
+    assertEquals(
+      BPath.fromString("a").toTry.get.last,
+      "a"
+    )
+
+    assertEquals(
+      BPath.fromString("a/...").toTry.get.last,
+      "..."
+    )
+
+    assertEquals(
+      BPath.BNil.last,
+      ""
+    )
+  }
+
   test("should create BazelLabels from strings") {
     def law(bl1: BazelLabel, bl2: BazelLabel): Unit =
       assertEquals(bl1, bl2)

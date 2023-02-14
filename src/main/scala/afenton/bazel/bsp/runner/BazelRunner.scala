@@ -10,6 +10,8 @@ import cats.effect.IO
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import fs2.Stream
+import fs2.io.file.Watcher
+import fs2.io.file.Path as FPath
 import io.bazel.rules_scala.diagnostics.diagnostics.Diagnostic
 import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
 import io.bazel.rules_scala.diagnostics.diagnostics.TargetDiagnostics
@@ -31,13 +33,15 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
+import afenton.bazel.bsp.protocol.BspClient
+import cats.parse.SemVer
 
 trait BazelRunner:
   def compile(target: BazelLabel): Stream[IO, FileDiagnostics]
   def clean: IO[Unit]
   def shutdown: IO[Unit]
-  def targetSources(target: BazelLabel): IO[List[String]]
-  def bspTargets: IO[List[BspServer.Target]]
+  def bspConfig(target: BazelLabel): IO[BazelRunner.BspConfig]
+  def bspTargets: IO[List[BazelLabel]]
 
 object BazelRunner:
 
@@ -131,17 +135,18 @@ object BazelRunner:
     ): Resource[IO, ExecutionResult] =
       runBazel(command, Some(label.asString))
 
-    def bspTargets: IO[List[BspServer.Target]] =
+    def bspTargets: IO[List[BazelLabel]] =
       runBazelOk(Command.Query, Some("kind(bsp_target, //...)"))
         .use { er =>
           er.stdoutLines
             .map(BazelLabel.fromString)
-            .collect { case Right(label) =>
-              BspServer.Target(
-                UriFactory.bazelUri(label.asString),
-                label.target.map(_.asString).getOrElse(label.asString)
-              )
-            }
+            .collect { case Right(label) => label }
+            // .collect { case Right(label) =>
+            //   BspServer.Target(
+            //     UriFactory.bazelUri(label.asString),
+            //     label.target.map(_.asString).getOrElse(label.asString)
+            //   )
+            // }
             .compile
             .toList
         }
@@ -152,16 +157,17 @@ object BazelRunner:
     def clean: IO[Unit] =
       runBazelOk(Command.Clean, None).use_
 
-    private def readSourceFile(target: BazelLabel): IO[List[String]] =
+    private def readBspTarget(target: BazelLabel): IO[BspConfig] =
       val filePath = workspaceRoot
         .resolve("bazel-bin")
         .resolve(target.packagePath.asPath)
-        .resolve("sources.json")
-      FilesIO.readJson[BazelSources](filePath).map(_.sources)
+        .resolve("bsp_target.json")
 
-    def targetSources(target: BazelLabel): IO[List[String]] =
+      FilesIO.readJson[BspConfig](filePath)
+
+    def bspConfig(target: BazelLabel): IO[BspConfig] =
       runBazel(Command.Build, target).use_ *>
-        readSourceFile(target)
+        readBspTarget(target)
 
     private def diagnostics: Stream[IO, FileDiagnostics] =
       FilesIO
@@ -183,34 +189,89 @@ object BazelRunner:
             }
         }
 
-    def compile(label: BazelLabel): Stream[IO, FileDiagnostics] =
-      Stream
-        .eval {
-          runBazel(Command.Build, label.allRulesResursive)
-            .use { er =>
-              BazelRunner
-                .raiseIfUnxpectedExit(
-                  er,
-                  ExitCode.Ok,
-                  ExitCode.BuildFailed
-                )
-                .as(er.exitCode)
-            }
+    private def watch(label: BazelLabel): Resource[IO, Watcher[IO]] =
+      Watcher.default[IO].map { watcher =>
+        watcher.watch(FPath.fromNioPath(label.diagnosticsFile))
+        watcher.watch(FPath.fromNioPath(label.jarFile))
+        watcher
+      }
+
+    private def changedFiles(watcher: Watcher[IO]): Stream[IO, Path] =
+      watcher.events().collect {
+        case Watcher.Event.Created(p, _)  => p.toNioPath
+        case Watcher.Event.Modified(p, _) => p.toNioPath
+      }
+
+
+    def compile(label: BazelLabel): Stream[IO, Watcher.Event] =
+        val io = watch(label).use { watcher => 
+          val s1 = Stream.eval(runCompile(label))
+          val s2 = watcher.events()
+          
+          s1.concurrently(s2)
         }
-        .flatMap { exitCode =>
-          ExitCode.fromCode(exitCode) match
-            case ExitCode.BuildFailed => diagnostics
-            case _                    => Stream.empty
-        }
+
+        Stream.force(io)
+
+    private def runCompile(label: BazelLabel): IO[Unit] =
+      ???
+
+    // private def runCompile(label: BazelLabel): Stream[IO, FileDiagnostics] =
+    //   Stream
+    //     .eval {
+    //       runBazel(Command.Build, label.allRulesResursive)
+    //         .use { er =>
+    //           BazelRunner
+    //             .raiseIfUnxpectedExit(
+    //               er,
+    //               ExitCode.Ok,
+    //               ExitCode.BuildFailed
+    //             )
+    //             .as(er.exitCode)
+    //         }
+    //     }
+    //     .flatMap { exitCode =>
+    //       ExitCode.fromCode(exitCode) match
+    //         case ExitCode.BuildFailed => diagnostics
+    //         case _                    => Stream.empty
+    //     }
 
   end BazelRunnerImpl
 
-  case class BazelSources(sources: List[String], buildFiles: List[String])
+  case class BspConfig(
+      scalaVersion: String,
+      scalacOptions: List[String],
+      compileJars: List[Path],
+      sources: List[String],
+      packages: List[String]
+  ):
+    private lazy val jarMap: Map[String, Path] =
+      compileJars.map(p => (p.getFileName.toString, p)).toMap
 
-  object BazelSources:
-    given Decoder[BazelSources] = Decoder.instance { c =>
+    def majorScalaVersion: String = scalaVersion match
+      case BspConfig.Pattern(major @ "2", minor, patch) => s"$major.$minor"
+      case BspConfig.Pattern(major @ "3", minor, patch) => major
+
+    def scalaLibraryJar: Path = jarMap("scala-library-2.12.14-stamped.jar")
+    def scalaReflectJar: Path = jarMap("scala-reflect-2.12.14-stamped.jar")
+
+  object BspConfig:
+    private val Pattern = raw"^(\d+)\.(\d+).(\d+)$$".r
+
+    given Decoder[BspConfig] = Decoder.instance { c =>
       for
+        scalaVersion <- c.downField("scala_version").as[String]
+        scalacOptions <- c.downField("scalac_options").as[List[String]]
+        compileJars <- c.downField("scala_compile_jars").as[List[Path]]
         sources <- c.downField("sources").as[List[String]]
-        buildFiles <- c.downField("buildFiles").as[List[String]]
-      yield BazelSources(sources, buildFiles)
+        packages <- c.downField("packages").as[List[String]]
+      yield BspConfig(
+        scalaVersion,
+        scalacOptions,
+        compileJars,
+        sources,
+        packages
+      )
     }
+
+    given Decoder[Path] = Decoder[String].map(s => Paths.get(s))

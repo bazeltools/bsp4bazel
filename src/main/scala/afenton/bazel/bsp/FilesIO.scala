@@ -13,6 +13,10 @@ import java.nio.file.PathMatcher
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import java.nio.file.Paths
+import java.util.zip.ZipFile
+import scala.jdk.CollectionConverters.*
+import cats.syntax.all._
+import cats.effect.kernel.Resource
 
 object FilesIO:
 
@@ -65,3 +69,25 @@ object FilesIO:
 
   def exists(file: Path): IO[Boolean] =
     IO.blocking(Files.exists(file))
+
+  def createDirectories(path: Path): IO[Path] =
+    IO.blocking(Files.createDirectories(path))
+
+  def openZipFile(zipFile: Path): Resource[IO, ZipFile] =
+    Resource.make(IO.blocking(new ZipFile(zipFile.toFile)))(f => IO.blocking(f.close))
+
+  def unZip(zipFile: Path, destPath: Path): IO[Unit] =
+    openZipFile(zipFile).use { zf => 
+      for
+        dest <- createDirectories(destPath)
+        entries <- IO.blocking(zf.entries.asScala.toList)
+        _ <- entries.map { entry =>
+          val dest = destPath.resolve(entry.getName)
+
+          IO.blocking {
+            if entry.isDirectory then Files.createDirectory(dest)
+            else Files.copy(zf.getInputStream(entry), dest)
+          }
+        }.sequence_
+      yield ()
+    }

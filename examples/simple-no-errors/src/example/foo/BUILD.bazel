@@ -3,7 +3,7 @@ load("@bazel-bsp-rules//:bsp_target.bzl", "bsp_target")
 
 scala_library(
     name = "foo",
-    srcs = glob(["*.scala"]),
+    srcs = glob(["**/*.scala"]),
     visibility = ["//visibility:public"],
 )
 

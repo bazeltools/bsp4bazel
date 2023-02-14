@@ -65,18 +65,99 @@ class BazelBspServer(
       _ <- logger.info("build/initialized")
       state <- stateRef.get
       root <- state.workspaceRoot.asIO
-      ws <- workspaceBuildTargets(())
-      ts <- state.bazelRunner.mapToIO { runner =>
-        doBuildTargetSources(
-          root,
-          runner,
-          ws.targets.map(_.id)
-        )
-      }
+      runner <- state.bazelRunner.asIO
+      bspTargetLabels <- runner.bspTargets
+      details <- targetDetails(root, runner, bspTargetLabels)
       _ <- stateRef.update(s =>
-        s.copy(targetSourceMap = BazelBspServer.TargetSourceMap(ts))
+        s.copy(
+          targets = details.keys.toList,
+          targetDetails = details,
+          targetSourceMap = BazelBspServer.TargetSourceMap.fromTargetDetails(
+            details.values.toList
+          )
+        )
       )
     yield ()
+
+  private def targetDetails(
+      workspaceRoot: Path,
+      bazelRunner: BazelRunner,
+      targetLabels: List[BazelLabel]
+  ): IO[Map[BuildTargetIdentifier, BazelBspServer.TargetDetails]] =
+    targetLabels
+      .traverse { label =>
+        for
+          config <- bazelRunner.bspConfig(label)
+          bt = mkBuildTarget(workspaceRoot, label, config)
+        yield (bt.id, BazelBspServer.TargetDetails(bt, config, label))
+      }
+      .map(_.toMap)
+
+  private def mkBuildTarget(
+      workspaceRoot: Path,
+      targetLabel: BazelLabel,
+      bspConfig: BazelRunner.BspConfig
+  ): BuildTarget =
+    val id = UriFactory.bazelUri(targetLabel.asString)
+    val name =
+      targetLabel.target.map(_.asString).getOrElse(targetLabel.asString)
+
+    BuildTarget(
+      BuildTargetIdentifier(id),
+      Some(name),
+      Some(UriFactory.fileUri(workspaceRoot)),
+      List("library"),
+      BuildTargetCapabilities(true, false, false, false),
+      List("scala"),
+      Nil,
+      Some("scala"),
+      Some(
+        ScalaBuilderTarget(
+          "org.scala-lang",
+          bspConfig.scalaVersion,
+          bspConfig.majorScalaVersion,
+          ScalaPlatform.JVM,
+          bspConfig.compileJars.map(UriFactory.fileUri),
+          None
+        ).asJson
+      )
+    )
+
+  def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult] =
+    for
+      _ <- logger.info("workspace/buildTargets")
+      state <- stateRef.get
+    yield WorkspaceBuildTargetsResult(
+      state.targetDetails.values.toList.map(_.buildTarget)
+    )
+
+  def buildTargetScalacOptions(
+      params: ScalacOptionsParams
+  ): IO[ScalacOptionsResult] =
+    for
+      _ <- logger.info("buildTarget/scalacOptions")
+      state <- stateRef.get
+      root <- state.workspaceRoot.asIO
+    yield
+      val items = params.targets.map { target =>
+        val details = state.targetDetails(target)
+        val semanticDbPath = root.resolve("bazel-bin").resolve(details.label.packagePath.withoutWildcard.asPath)
+        ScalacOptionsItem(
+          target,
+          details.bspConfig.scalacOptions,
+          Nil,
+          UriFactory.fileUri(semanticDbPath)
+        )
+      }
+      ScalacOptionsResult(items)
+
+  def buildTargetJavacOptions(
+      params: JavacOptionsParams
+  ): IO[JavacOptionsResult] =
+    for
+      _ <- logger.info("buildTarget/javacOptions")
+      resp = JavacOptionsResult(Nil)
+    yield resp
 
   def buildTargetInverseSources(
       params: InverseSourcesParams
@@ -96,58 +177,6 @@ class BazelBspServer(
           TextDocumentIdentifier(relativeUri)
         )
       )
-
-  private def buildTarget(
-      bspTarget: BspServer.Target,
-      workspaceRoot: Path
-  ): BuildTarget =
-    BuildTarget(
-      BuildTargetIdentifier(bspTarget.id),
-      Some(bspTarget.name),
-      Some(UriFactory.fileUri(workspaceRoot)),
-      List("library"),
-      BuildTargetCapabilities(true, false, false, false),
-      List("scala"),
-      Nil,
-      Some("scala"),
-      Some(
-        ScalaBuilderTarget(
-          "org.scala-lang",
-          "2.12",
-          "2.12",
-          ScalaPlatform.JVM,
-          Nil,
-          None
-        ).asJson
-      )
-    )
-
-  def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult] =
-    for
-      _ <- logger.info("workspace/buildTargets")
-      state <- stateRef.get
-      runner <- state.bazelRunner.asIO
-      root <- state.workspaceRoot.asIO
-      bspTargets <- runner.bspTargets
-    yield WorkspaceBuildTargetsResult(
-      bspTargets.map(t => buildTarget(t, root))
-    )
-
-  def buildTargetScalacOptions(
-      params: ScalacOptionsParams
-  ): IO[ScalacOptionsResult] =
-    for
-      _ <- logger.info("buildTarget/scalacOptions")
-      resp = ScalacOptionsResult(Nil)
-    yield resp
-
-  def buildTargetJavacOptions(
-      params: JavacOptionsParams
-  ): IO[JavacOptionsResult] =
-    for
-      _ <- logger.info("buildTarget/javacOptions")
-      resp = JavacOptionsResult(Nil)
-    yield resp
 
   private def doCompile(
       workspaceRoot: Path,
@@ -262,23 +291,6 @@ class BazelBspServer(
       _ <- exitSignal.complete(Right(()))
     yield ()
 
-  private def doBuildTargetSources(
-      workspaceRoot: Path,
-      bazelRunner: BazelRunner,
-      targets: List[BuildTargetIdentifier]
-  ): IO[Map[BuildTargetIdentifier, List[TextDocumentIdentifier]]] =
-    targets
-      .traverse { bt =>
-        BazelLabel.fromBuildTargetIdentifier(bt) match
-          case Right(bazelTarget) =>
-            bazelRunner
-              .targetSources(bazelTarget)
-              .map(ss => (bt, ss.map(s => TextDocumentIdentifier.file(s))))
-          case Left(err) =>
-            IO.raiseError(err)
-      }
-      .map(_.toMap)
-
   def buildTargetSource(params: SourcesParams): IO[SourcesResult] =
     for
       _ <- logger.info("buildTarget/sources")
@@ -325,16 +337,30 @@ end BazelBspServer
 
 object BazelBspServer:
 
+  case class TargetDetails(
+      buildTarget: BuildTarget,
+      bspConfig: BazelRunner.BspConfig,
+      label: BazelLabel
+  )
+
   case class ServerState(
-      targetSourceMap: BazelBspServer.TargetSourceMap,
-      currentErrors: List[FileDiagnostics],
       workspaceRoot: Option[Path],
       bazelRunner: Option[BazelRunner],
-      targets: List[BuildTarget]
+      targets: List[BuildTargetIdentifier],
+      targetDetails: Map[BuildTargetIdentifier, TargetDetails],
+      targetSourceMap: BazelBspServer.TargetSourceMap,
+      currentErrors: List[FileDiagnostics]
   )
 
   def defaultState: ServerState =
-    ServerState(BazelBspServer.TargetSourceMap.empty, Nil, None, None, Nil)
+    ServerState(
+      None,
+      None,
+      Nil,
+      Map.empty,
+      BazelBspServer.TargetSourceMap.empty,
+      Nil
+    )
 
   def create(client: BspClient, logger: Logger): IO[BazelBspServer] =
     for
@@ -353,7 +379,7 @@ object BazelBspServer:
         .flatMap((bt, ls) => ls.map(l => (l, bt)))
         .groupMap(_._1)(_._2)
 
-    private val sourceTargets
+    private lazy val sourceTargets
         : Map[TextDocumentIdentifier, List[BuildTargetIdentifier]] =
       invertMap(_targetSources)
 
@@ -369,3 +395,12 @@ object BazelBspServer:
 
   object TargetSourceMap:
     def empty: TargetSourceMap = TargetSourceMap(Map.empty)
+
+    def fromTargetDetails(targetDetails: List[TargetDetails]): TargetSourceMap =
+      val tsm = targetDetails.map { td =>
+        val files =
+          td.bspConfig.sources.map(s => TextDocumentIdentifier.file(s))
+        (td.buildTarget.id, files)
+      }.toMap
+
+      TargetSourceMap(tsm)

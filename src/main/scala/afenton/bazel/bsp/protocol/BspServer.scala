@@ -4,6 +4,7 @@ import afenton.bazel.bsp.jrpc.RpcFunction
 import cats.effect.IO
 
 import java.net.URI
+import java.nio.file.Path
 
 trait BspServer(client: BspClient):
   def buildInitialize(params: InitializeBuildParams): IO[InitializeBuildResult]
@@ -61,4 +62,3 @@ object BspServer:
       RpcFunction(bspServer.cancelRequest)
   }
 
-  case class Target(id: URI, name: String)
