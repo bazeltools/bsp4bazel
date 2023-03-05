@@ -1,5 +1,5 @@
 # BSP 4 Bazel
-Current Version: [0.0.27](https://github.com/bazeltools/bsp4bazel/releases/tag/0.0.27)
+Current Version: [0.0.28](https://github.com/bazeltools/bsp4bazel/releases/tag/0.0.28)
 
 **NOTE: This is still an alpha version. And fairly new. See TODO below for what's still msising**
 
@@ -22,10 +22,10 @@ Setup `scala_rules` to enable diagnostic files to be written. Instructions for t
 Add the bsp4bazel rules to your workspace
 
 ```starlark
-bsp4bazel_version = "0.0.27"
+bsp4bazel_version = "0.0.28"
 http_archive(
     name = "bsp4bazel-rules",
-    sha256 = "7697422047f4382fe230444297c70eb2be113ae5842196080f129732bede9191",
+    sha256 = "177671b2072646b1e91c74991593eb1e0cf80a75b459ea0d9a1d7e0e0e3bed76",
     strip_prefix = "bazel_rules",
     type = "tar.gz",
     url = "https://github.com/bazeltools/bsp4bazel/releases/download/%s/bazel_rules.tar.gz" % bsp4bazel_version,
