@@ -45,7 +45,7 @@ object BuildTargetIdentifier:
   def file(uri: String): BuildTargetIdentifier =
     BuildTargetIdentifier(UriFactory.fileUri(uri))
 
-case class ScalaBuilderTarget(
+case class ScalaBuildTarget(
     scalaOrganization: String,
     scalaVersion: String,
     scalaBinaryVersion: String,
@@ -53,21 +53,28 @@ case class ScalaBuilderTarget(
     jars: List[URI],
     jvmBuildTarget: Option[JvmBuildTarget]
 )
-object ScalaBuilderTarget:
-  given Encoder[ScalaBuilderTarget] =
-    deriveEncoder[ScalaBuilderTarget]
+object ScalaBuildTarget:
+  given Codec[ScalaBuildTarget] =
+    deriveCodec[ScalaBuildTarget]
 
 enum ScalaPlatform(val id: Int):
   case JVM extends ScalaPlatform(1)
   case JS extends ScalaPlatform(2)
   case Native extends ScalaPlatform(3)
 object ScalaPlatform:
+
   given Encoder[ScalaPlatform] = Encoder.instance(sp => sp.id.asJson)
+
+  given Decoder[ScalaPlatform] = Decoder[Int].map {
+    case 1 => ScalaPlatform.JVM
+    case 2 => ScalaPlatform.JS
+    case 3 => ScalaPlatform.Native
+  }
 
 case class JvmBuildTarget(javaHome: Option[URI], javaVersion: Option[String])
 object JvmBuildTarget:
-  given Encoder[JvmBuildTarget] =
-    deriveEncoder[JvmBuildTarget]
+  given Codec[JvmBuildTarget] =
+    deriveCodec[JvmBuildTarget]
 
 case class BuildTarget(
     id: BuildTargetIdentifier,
@@ -81,8 +88,8 @@ case class BuildTarget(
     data: Option[Json]
 )
 object BuildTarget:
-  given Encoder[BuildTarget] =
-    deriveEncoder[BuildTarget]
+  given Codec[BuildTarget] =
+    deriveCodec[BuildTarget]
 
 case class BuildTargetCapabilities(
     canCompile: Boolean,
@@ -91,8 +98,8 @@ case class BuildTargetCapabilities(
     canDebug: Boolean
 )
 object BuildTargetCapabilities:
-  given Decoder[BuildTargetCapabilities] =
-    deriveDecoder[BuildTargetCapabilities]
+  given Codec[BuildTargetCapabilities] =
+    deriveCodec[BuildTargetCapabilities]
 
 case class InitializeBuildParams(
     displayName: String,
@@ -233,8 +240,8 @@ object CompileParams:
 
 case class WorkspaceBuildTargetsResult(targets: List[BuildTarget])
 object WorkspaceBuildTargetsResult:
-  given Encoder[WorkspaceBuildTargetsResult] =
-    deriveEncoder[WorkspaceBuildTargetsResult]
+  given Codec[WorkspaceBuildTargetsResult] =
+    deriveCodec[WorkspaceBuildTargetsResult]
 
 case class ScalacOptionsParams(targets: List[BuildTargetIdentifier])
 object ScalacOptionsParams:

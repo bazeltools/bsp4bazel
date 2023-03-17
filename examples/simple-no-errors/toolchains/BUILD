@@ -3,11 +3,6 @@ load("@io_bazel_rules_scala//scala:providers.bzl", "declare_deps_provider")
 
 scala_toolchain(
     name = "my_toolchain_impl",
-    # dep_providers = [
-    #     ":my_scala_compile_classpath_provider",
-    #     ":my_scala_library_classpath_provider",
-    #     ":my_scala_macro_classpath_provider",
-    # ],
     enable_diagnostics_report = True,
     enable_semanticdb = True,
     visibility = ["//visibility:public"],

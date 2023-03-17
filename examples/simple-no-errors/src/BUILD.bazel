@@ -9,6 +9,6 @@ scala_binary(
 )
 
 bsp_target(
-    name = "src_bsp",
+    name = "src_target",
     target = ":main_run",
 )

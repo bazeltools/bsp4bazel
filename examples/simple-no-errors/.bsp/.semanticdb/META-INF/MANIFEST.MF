@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Class-Path: 
+Created-By: bazel
+Target-Label: //src/example:example
+

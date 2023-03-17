@@ -13,6 +13,9 @@ import cats.parse.Parser0 as P0
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.annotation.tailrec
+import io.circe.Decoder
+import cats.syntax.all.*
+import io.circe.Encoder
 
 sealed trait BazelTarget:
   def asString: String = this match
@@ -148,7 +151,7 @@ case class BazelLabel(
   def diagnosticsFile: Path =
     packageFile(".diagnosticsproto")
 
-  def jarFile: Path = 
+  def jarFile: Path =
     packageFile(".jar")
 
   def withTarget(bt: BazelTarget): BazelLabel =
@@ -194,3 +197,14 @@ object BazelLabel:
       .map { case ((r, p), t) =>
         BazelLabel(r, p, t.flatten)
       }
+
+  given Encoder[BazelLabel] =
+    Encoder[String].contramap(_.asString)
+
+  given Decoder[BazelLabel] =
+    Decoder[String].flatMap(str => 
+      BazelLabel.parse(str) match {
+        case Right(label) => Decoder.const(label)
+        case Left(err) => Decoder.failedWithMessage(err.show)
+      }
+    )

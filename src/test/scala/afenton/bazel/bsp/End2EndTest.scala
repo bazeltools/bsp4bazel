@@ -20,6 +20,10 @@ import io.circe.syntax.*
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration._
+import afenton.bazel.bsp.protocol.WorkspaceBuildTargetsResult
+import java.nio.file.Files
+import afenton.bazel.bsp.protocol.UriFactory
+import afenton.bazel.bsp.protocol.ScalaBuildTarget
 
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
@@ -27,6 +31,13 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
   override val munitTimeout = 10.minute
 
   val projectRoot = Paths.get("").toAbsolutePath
+
+  private def deleteDirectory(path: Path): Unit =
+    if Files.exists(path) then
+      Files
+        .walk(path)
+        .sorted(java.util.Comparator.reverseOrder)
+        .forEach(Files.deleteIfExists)
 
   def bazelEnv(workspaceRoot: Path) = FunFixture[(Path, BazelRunner)](
     setup = { test =>
@@ -36,6 +47,8 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         Logger.noOp
       )
       (br.shutdown >> br.clean).unsafeRunSync()
+
+      deleteDirectory(workspaceRoot.resolve(".bsp/.semanticdb"))
       (workspaceRoot, br)
     },
     teardown = { (_, br) => br.shutdown }
@@ -67,10 +80,41 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
     }
 
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
+    .test("should have BSP targets") { (root, bazel) =>
+
+      val (responses, notifications) = Lsp.start.workspaceTargets.shutdown
+        .runIn(root)
+        .unsafeRunSync()
+
+      assertEquals(notifications, Nil)
+
+      val targets = responses.select[WorkspaceBuildTargetsResult].targets
+      assertEquals(targets.size, 2)
+      targets.foreach { target =>
+        assertEquals(target.baseDirectory, Some(UriFactory.fileUri(root)))
+        assertEquals(target.languageIds, List("scala"))
+        assertEquals(target.dataKind, Some("scala"))
+
+        assert(target.data.isDefined)
+        val sbt = target.data.get.as[ScalaBuildTarget].toOption.get
+        assertEquals(sbt.scalaVersion, "2.12.14")
+        assertEquals(sbt.scalaBinaryVersion, "2.12")
+
+        assertEquals(
+          sbt.jars.map(uri => Paths.get(uri).getFileName.toString).sorted,
+          List(
+            "scala-library-2.12.14-stamped.jar",
+            "scala-reflect-2.12.14-stamped.jar"
+          )
+        )
+      }
+    }
+
+  bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
     .test("should compile with no errors") { (root, bazel) =>
 
       val (_, notifications) = Lsp.start
-        .compile("//...")
+        .compile("//src:bsp_metadata_src_target")
         .shutdown
         .runIn(root)
         .unsafeRunSync()
@@ -96,7 +140,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
     .test("should compile and report 3 errors") { (root, bazel) =>
 
       val (_, notifications) = Lsp.start
-        .compile("//...")
+        .compile("//src:bsp_metadata_src_target")
         .shutdown
         .runIn(root)
         .unsafeRunSync()

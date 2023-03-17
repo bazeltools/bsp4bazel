@@ -57,6 +57,7 @@ object BazelRunner:
   enum Command(val asString: String):
     case Query extends Command("query")
     case Build extends Command("build")
+    case Run extends Command("run")
     case Test extends Command("test")
     case Shutdown extends Command("shutdown")
     case Clean extends Command("clean")
@@ -136,17 +137,11 @@ object BazelRunner:
       runBazel(command, Some(label.asString))
 
     def bspTargets: IO[List[BazelLabel]] =
-      runBazelOk(Command.Query, Some("kind(bsp_target, //...)"))
+      runBazelOk(Command.Query, Some("kind('bsp_metadata', //...)"))
         .use { er =>
           er.stdoutLines
             .map(BazelLabel.fromString)
             .collect { case Right(label) => label }
-            // .collect { case Right(label) =>
-            //   BspServer.Target(
-            //     UriFactory.bazelUri(label.asString),
-            //     label.target.map(_.asString).getOrElse(label.asString)
-            //   )
-            // }
             .compile
             .toList
         }
@@ -189,52 +184,26 @@ object BazelRunner:
             }
         }
 
-    private def watch(label: BazelLabel): Resource[IO, Watcher[IO]] =
-      Watcher.default[IO].map { watcher =>
-        watcher.watch(FPath.fromNioPath(label.diagnosticsFile))
-        watcher.watch(FPath.fromNioPath(label.jarFile))
-        watcher
-      }
 
-    private def changedFiles(watcher: Watcher[IO]): Stream[IO, Path] =
-      watcher.events().collect {
-        case Watcher.Event.Created(p, _)  => p.toNioPath
-        case Watcher.Event.Modified(p, _) => p.toNioPath
-      }
-
-
-    def compile(label: BazelLabel): Stream[IO, Watcher.Event] =
-        val io = watch(label).use { watcher => 
-          val s1 = Stream.eval(runCompile(label))
-          val s2 = watcher.events()
-          
-          s1.concurrently(s2)
+    def compile(label: BazelLabel): Stream[IO, FileDiagnostics] =
+      Stream
+        .eval {
+          runBazel(Command.Run, label)
+            .use { er =>
+              BazelRunner
+                .raiseIfUnxpectedExit(
+                  er,
+                  ExitCode.Ok,
+                  ExitCode.BuildFailed
+                )
+                .as(er.exitCode)
+            }
         }
-
-        Stream.force(io)
-
-    private def runCompile(label: BazelLabel): IO[Unit] =
-      ???
-
-    // private def runCompile(label: BazelLabel): Stream[IO, FileDiagnostics] =
-    //   Stream
-    //     .eval {
-    //       runBazel(Command.Build, label.allRulesResursive)
-    //         .use { er =>
-    //           BazelRunner
-    //             .raiseIfUnxpectedExit(
-    //               er,
-    //               ExitCode.Ok,
-    //               ExitCode.BuildFailed
-    //             )
-    //             .as(er.exitCode)
-    //         }
-    //     }
-    //     .flatMap { exitCode =>
-    //       ExitCode.fromCode(exitCode) match
-    //         case ExitCode.BuildFailed => diagnostics
-    //         case _                    => Stream.empty
-    //     }
+        .flatMap { exitCode =>
+          ExitCode.fromCode(exitCode) match
+            case ExitCode.BuildFailed => diagnostics
+            case _                    => Stream.empty
+        }
 
   end BazelRunnerImpl
 
@@ -243,7 +212,8 @@ object BazelRunner:
       scalacOptions: List[String],
       compileJars: List[Path],
       sources: List[String],
-      packages: List[String]
+      packages: List[String],
+      compileLabel: BazelLabel
   ):
     private lazy val jarMap: Map[String, Path] =
       compileJars.map(p => (p.getFileName.toString, p)).toMap
@@ -265,12 +235,14 @@ object BazelRunner:
         compileJars <- c.downField("scala_compile_jars").as[List[Path]]
         sources <- c.downField("sources").as[List[String]]
         packages <- c.downField("packages").as[List[String]]
+        compileLabel <- c.downField("compile_label").as[BazelLabel]
       yield BspConfig(
         scalaVersion,
         scalacOptions,
         compileJars,
         sources,
-        packages
+        packages,
+        compileLabel
       )
     }
 

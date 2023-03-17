@@ -9,7 +9,7 @@ http_archive(
     url = "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/{}/bazel-skylib-{}.tar.gz".format(skylib_version, skylib_version),
 )
 
-rules_scala_version = "c711b4d1f0d1cc386c63ef748c9df14d2f3a187e"
+rules_scala_version = "9ddca47d8f81af2204f725547eb550a5c89820b0"
 
 http_archive(
     name = "io_bazel_rules_scala",
@@ -45,6 +45,9 @@ rules_proto_toolchains()
 
 register_toolchains("//toolchains:my_scala_toolchain")
 
+load("@io_bazel_rules_scala//scala/semanticdb:semanticdb_repositories.bzl", "semanticdb_repositories")
+semanticdb_repositories()
+
 # Load bazel-bsp-rules
 
 local_repository(
@@ -54,3 +57,4 @@ local_repository(
 
 load("@bazel-bsp-rules//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
 bazel_bsp_setup()
+

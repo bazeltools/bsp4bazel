@@ -1,4 +1,6 @@
 
+exports_files(["unzip_jar_metainf.sh.tpl"])
+
 config_setting(
     name = "macos_x86",
     constraint_values = [

@@ -8,6 +8,6 @@ scala_library(
 )
 
 bsp_target(
-    name = "foo_bsp",
+    name = "foo_target",
     target = ":foo",
 )

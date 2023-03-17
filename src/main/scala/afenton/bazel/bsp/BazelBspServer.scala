@@ -112,12 +112,12 @@ class BazelBspServer(
       Nil,
       Some("scala"),
       Some(
-        ScalaBuilderTarget(
+        ScalaBuildTarget(
           "org.scala-lang",
           bspConfig.scalaVersion,
           bspConfig.majorScalaVersion,
           ScalaPlatform.JVM,
-          bspConfig.compileJars.map(UriFactory.fileUri),
+          bspConfig.compileJars.map(p => UriFactory.fileUri(workspaceRoot.resolve(p))),
           None
         ).asJson
       )
@@ -141,10 +141,14 @@ class BazelBspServer(
     yield
       val items = params.targets.map { target =>
         val details = state.targetDetails(target)
-        val semanticDbPath = root.resolve("bazel-bin").resolve(details.label.packagePath.withoutWildcard.asPath)
+        val semanticDbPath = root.resolve(".bsp/.semanticdb")
         ScalacOptionsItem(
           target,
-          details.bspConfig.scalacOptions,
+          details.bspConfig.scalacOptions ++ List(
+            "-Xplugin:/vol/src/bsp4bazel/examples/simple-no-errors/bazel-out/k8-fastbuild/bin/external/org_scalameta_semanticdb_scalac/org_scalameta_semanticdb_scalac.stamp/semanticdb-scalac_2.12.14-4.7.3-stamped.jar",
+            "-P:semanticdb:sourceroot:/vol/src/bsp4bazel/examples/simple-no-errors",
+            "-P:semanticdb:targetroot:/vol/src/bsp4bazel/examples/simple-no-errors/.bsp/.semanticdb"
+          ),
           Nil,
           UriFactory.fileUri(semanticDbPath)
         )
@@ -182,42 +186,39 @@ class BazelBspServer(
       workspaceRoot: Path,
       bazelRunner: BazelRunner,
       target: BuildTargetIdentifier,
+      compileTarget: BazelLabel,
       id: TaskId
   ): IO[List[FileDiagnostics]] =
-    BazelLabel.fromBuildTargetIdentifier(target) match {
-      case Right(bazelLabel) =>
-        bazelRunner
-          .compile(bazelLabel)
-          .filterNot(fd => fd.path.toString.endsWith("<no file>"))
-          .evalTap { fd =>
-            for
-              time <- IO.realTimeInstant
-              _ <- client.buildTaskProgress(
-                TaskProgressParams(
-                  id,
-                  Some(time.toEpochMilli),
-                  Some("Compile In Progress"),
-                  Some(50),
-                  Some("files"),
-                  None,
-                  None
-                )
-              )
-            yield ()
-          }
-          .evalTap { fd =>
-            PublishDiagnosticsParams
-              .fromScalacDiagnostic(
-                workspaceRoot,
-                target,
-                fd
-              )
-              .mapToIO(client.publishDiagnostics(_))
-          }
-          .compile
-          .toList
-      case Left(err) => IO.raiseError(err)
-    }
+    bazelRunner
+      .compile(compileTarget)
+      .filterNot(fd => fd.path.toString.endsWith("<no file>"))
+      .evalTap { fd =>
+        for
+          time <- IO.realTimeInstant
+          _ <- client.buildTaskProgress(
+            TaskProgressParams(
+              id,
+              Some(time.toEpochMilli),
+              Some("Compile In Progress"),
+              Some(50),
+              Some("files"),
+              None,
+              None
+            )
+          )
+        yield ()
+      }
+      .evalTap { fd =>
+        PublishDiagnosticsParams
+          .fromScalacDiagnostic(
+            workspaceRoot,
+            target,
+            fd
+          )
+          .mapToIO(client.publishDiagnostics(_))
+      }
+      .compile
+      .toList
 
   // If we don't get back any FileDiagnostics, we assume there's now no errors, so have to
   // clear these out by publishing an empty Diagnostic for them
@@ -243,6 +244,9 @@ class BazelBspServer(
 
   private def compileTarget(target: BuildTargetIdentifier): IO[Unit] =
     for
+      state <- stateRef.get
+      _ <- cats.effect.std.Console[IO].error(state.targetDetails)
+      details <- state.targetDetails.get(target).asIO
       id <- IO.randomUUID.map(u => TaskId(u.toString, None))
       start <- IO.realTimeInstant
       _ <- client.buildTaskStart(
@@ -254,10 +258,9 @@ class BazelBspServer(
           Some(CompileTask(target).asJson)
         )
       )
-      state <- stateRef.get
       runner <- state.bazelRunner.asIO
       fds <- state.workspaceRoot.mapToIO { root =>
-        doCompile(root, runner, target, id)
+        doCompile(root, runner, target, details.bspConfig.compileLabel, id)
       }
       _ <- clearPrevDiagnostics(target, fds)
       end <- IO.realTimeInstant
