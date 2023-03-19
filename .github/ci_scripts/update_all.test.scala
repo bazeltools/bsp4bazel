@@ -22,7 +22,7 @@ class WorkflowTest extends munit.FunSuite:
 
       os.write.over(tmpDir / "repo" / "README.md", FixtureData.Readme)
       os.write.over(
-        tmpDir / "repo" / "bazel_rules" / "bazel_bsp_setup.bzl",
+        tmpDir / "repo" / "bazel_rules" / "bsp4bazel_setup.bzl",
         FixtureData.BazelRule
       )
       os.write.over(tmpDir / "repo" / "build.sbt", FixtureData.BuildFile)
@@ -55,20 +55,20 @@ class WorkflowTest extends munit.FunSuite:
       os.read(workingDir / "README.md"),
       s"""
 # Bazel BSP
-Current Version: [$newVersion](https://github.com/aishfenton/bazel-bsp/releases/tag/$newVersion)
+Current Version: [$newVersion](https://github.com/bazeltools/bsp4bazel/releases/tag/$newVersion)
 
 ```starlark
-bazel_bsp_version = "$newVersion"
+bsp4bazel_version = "$newVersion"
 http_archive(
-    name = "bazel-bsp-rules",
+    name = "bsp4bazel-rules",
     sha256 = "$ruleSha",
     strip_prefix = "bazel_rules",
     type = "tar.gz",
-    url = "https://github.com/aishfenton/bazel-bsp/releases/download/%s/bazel_rules.tar.gz" % bazel_bsp_version,
+    url = "https://github.com/bazeltools/bsp4bazel/releases/download/%s/bazel_rules.tar.gz" % bsp4bazel_version,
 )
 
-load("@bazel-bsp-rules//bazel_rules:bazel_bsp_setup.bzl", "bazel_bsp_setup")
-bazel_bsp_setup()
+load("@bsp4bazel-rules//bazel_rules:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+bsp4bazel_setup()
 ```
 
 More blah blah blah
@@ -76,25 +76,25 @@ More blah blah blah
     )
 
     assertEquals(
-      os.read(workingDir / "bazel_rules" / "bazel_bsp_setup.bzl"),
+      os.read(workingDir / "bazel_rules" / "bsp4bazel_setup.bzl"),
       s"""
 load("//private:load_tool.bzl", "load_tool")
 
 # <--- Updated automatically by release job
-_bazel_bsp_version = "$newVersion"
+_bsp4bazel_version = "$newVersion"
 _build_artifact_shas = {
     "linux-x86": "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
     "macos-x86": "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f"
 }
 # --->
 
-def _bazel_bsp_load(platform):
-    name = "bazel-bsp-{}".format(platform)
+def _bsp4bazel_load(platform):
+    name = "bsp4bazel-{}".format(platform)
     ...
 
-def bazel_bsp_setup():
-    _bazel_bsp_load("linux-x86")
-    _bazel_bsp_load("macos-x86")
+def bsp4bazel_setup():
+    _bsp4bazel_load("linux-x86")
+    _bsp4bazel_load("macos-x86")
 """.trim
     )
 
@@ -104,15 +104,15 @@ def bazel_bsp_setup():
 val scala3Version = "3.2.1"
 
 // <--- Updated automatically by release job
-val bazelBspVersion = "$newVersion"
+val bsp4BazelVersion = "$newVersion"
 // --->
 
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "bazel-bsp",
-    organization := "afenton",
-    version := bazelBspVersion, 
+    name := "bsp4bazel",
+    organization := "bazeltools",
+    version := bsp4BazelVersion, 
     scalaVersion := scala3Version,
     buildInfoKeys := Seq[BuildInfoKey](
       name,
@@ -121,7 +121,7 @@ lazy val root = project
       sbtVersion,
       "bspVersion" -> "2.0.0-M2"
     ),
-    buildInfoPackage := "afenton.bazel.bsp"
+    buildInfoPackage := "bazeltools.bsp4bazel"
   )
 """.trim
     )
@@ -131,46 +131,46 @@ lazy val root = project
 object FixtureData:
 
   val ArtifactShas: Map[String, String] = Map(
-    "bazel-bsp-linux-x86.sha256" -> "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
-    "bazel-bsp-macos-x86.sha256" -> "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f"
+    "bsp4bazel-linux-x86.sha256" -> "83da2ffc0ab594a348f7828888d9e4c761ec128c38b1f013434f51f258cd6b9f",
+    "bsp4bazel-macos-x86.sha256" -> "2d450d6cb18c8e0f436389ff0fd439694336276f53966e6d01206de4bc1f376f"
   )
 
   val BazelRule = raw"""
 load("//private:load_tool.bzl", "load_tool")
 
 # <--- Updated automatically by release job
-_bazel_bsp_version = "0.0.19"
+_bsp4bazel_version = "0.0.19"
 _build_artifact_shas = {
     "linux-x86": "a3453ktnegakjdngf43yt334g34g3g34g34g",
     "amiga-m68000": "34534lsbflsldfb43mh34hlmbrebml34h34h",
 }
 # --->
 
-def _bazel_bsp_load(platform):
-    name = "bazel-bsp-{}".format(platform)
+def _bsp4bazel_load(platform):
+    name = "bsp4bazel-{}".format(platform)
     ...
 
-def bazel_bsp_setup():
-    _bazel_bsp_load("linux-x86")
-    _bazel_bsp_load("macos-x86")
+def bsp4bazel_setup():
+    _bsp4bazel_load("linux-x86")
+    _bsp4bazel_load("macos-x86")
 """.trim
 
   val Readme = """
 # Bazel BSP
-Current Version: [0.0.19](https://github.com/aishfenton/bazel-bsp/releases/tag/0.0.19)
+Current Version: [0.0.19](https://github.com/bazeltools/bsp4bazel/releases/tag/0.0.19)
 
 ```starlark
-bazel_bsp_version = "0.0.19"
+bsp4bazel_version = "0.0.19"
 http_archive(
-    name = "bazel-bsp-rules",
+    name = "bsp4bazel-rules",
     sha256 = "5da0e3c951a7ea50be908d3b97bf2f0b2da8713b99c6035e826dfce3302d5b39",
     strip_prefix = "bazel_rules",
     type = "tar.gz",
-    url = "https://github.com/aishfenton/bazel-bsp/releases/download/%s/bazel_rules.tar.gz" % bazel_bsp_version,
+    url = "https://github.com/bazeltools/bsp4bazel/releases/download/%s/bazel_rules.tar.gz" % bsp4bazel_version,
 )
 
-load("@bazel-bsp-rules//bazel_rules:bazel_bsp_setup.bzl", "bazel_bsp_setup")
-bazel_bsp_setup()
+load("@bsp4bazel-rules//bazel_rules:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+bsp4bazel_setup()
 ```
 
 More blah blah blah
@@ -180,15 +180,15 @@ More blah blah blah
 val scala3Version = "3.2.1"
 
 // <--- Updated automatically by release job
-val bazelBspVersion = "0.0.19"
+val bsp4BazelVersion = "0.0.19"
 // --->
 
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "bazel-bsp",
-    organization := "afenton",
-    version := bazelBspVersion, 
+    name := "bsp4bazel",
+    organization := "bazeltools",
+    version := bsp4BazelVersion, 
     scalaVersion := scala3Version,
     buildInfoKeys := Seq[BuildInfoKey](
       name,
@@ -197,6 +197,6 @@ lazy val root = project
       sbtVersion,
       "bspVersion" -> "2.0.0-M2"
     ),
-    buildInfoPackage := "afenton.bazel.bsp"
+    buildInfoPackage := "bazeltools.bsp4bazel"
   )
 """.trim

@@ -3,7 +3,7 @@
 import scala.collection.mutable.Stack
 
 def extractVersion(buildContent: String): Option[SemVer] =
-  val VersionExpr = raw"^val bazelBspVersion = \"(\d+)\.(\d+).(\d+)\"$$".r
+  val VersionExpr = raw"^val bsp4BazelVersion = \"(\d+)\.(\d+).(\d+)\"$$".r
 
   buildContent
     .split("\n")

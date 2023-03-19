@@ -21,10 +21,10 @@ jobs:
         include:
           - os: macos-latest
             platform: macos-x86
-            artifact: bazel-bsp-macos-x86
+            artifact: bsp4bazel-macos-x86
           - os: ubuntu-20.04
             platform: linux-ubuntu-20.04
-            artifact: bazel-bsp-linux-x86
+            artifact: bsp4bazel-linux-x86
     name: Make binaries for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -42,9 +42,9 @@ jobs:
       # Update version in build.sbt first, as that gets backed into the native-image (via sbt-buildinfo)
       - name: Update version and build native image
         run: | 
-          scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bazelBspVersion" ${{ inputs.version }}
+          scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bsp4BazelVersion" ${{ inputs.version }}
           sbt clean compile graalvm-native-image:packageBin
-          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bazel-bsp staging ${{ matrix.artifact }} 
+          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bsp4bazel staging ${{ matrix.artifact }} 
       - name: Upload binary
         uses: actions/upload-artifact@v3
         with:
@@ -63,12 +63,12 @@ jobs:
       - name: Download linux 20.04
         uses: actions/download-artifact@v3
         with:
-          name: bazel-bsp-linux-x86
+          name: bsp4bazel-linux-x86
           path: staging
       - name: Download macos x86
         uses: actions/download-artifact@v3
         with:
-          name: bazel-bsp-macos-x86
+          name: bsp4bazel-macos-x86
           path: staging
       # Update versions, and shas, in files
       - name: Update versions, and shas
@@ -91,9 +91,9 @@ jobs:
           automatic_release_tag: "${{ inputs.version }}"
           prerelease: false
           files: |
-            staging/bazel-bsp-linux-x86
-            staging/bazel-bsp-linux-x86.sha256
-            staging/bazel-bsp-macos-x86
-            staging/bazel-bsp-macos-x86.sha256
+            staging/bsp4bazel-linux-x86
+            staging/bsp4bazel-linux-x86.sha256
+            staging/bsp4bazel-macos-x86
+            staging/bsp4bazel-macos-x86.sha256
             staging/bazel_rules.tar.gz
             staging/bazel_rules.tar.gz.sha256
