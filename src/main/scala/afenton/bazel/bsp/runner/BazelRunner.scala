@@ -184,7 +184,6 @@ object BazelRunner:
             }
         }
 
-
     def compile(label: BazelLabel): Stream[IO, FileDiagnostics] =
       Stream
         .eval {
@@ -221,9 +220,6 @@ object BazelRunner:
     def majorScalaVersion: String = scalaVersion match
       case BspConfig.Pattern(major @ "2", minor, patch) => s"$major.$minor"
       case BspConfig.Pattern(major @ "3", minor, patch) => major
-
-    def scalaLibraryJar: Path = jarMap("scala-library-2.12.14-stamped.jar")
-    def scalaReflectJar: Path = jarMap("scala-reflect-2.12.14-stamped.jar")
 
   object BspConfig:
     private val Pattern = raw"^(\d+)\.(\d+).(\d+)$$".r

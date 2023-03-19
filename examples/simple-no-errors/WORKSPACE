@@ -21,7 +21,6 @@ http_archive(
 
 # Stores Scala version and other configuration
 # 2.12 is a default version, other versions can be use by passing them explicitly:
-# scala_config(scala_version = "2.11.12")
 load("@io_bazel_rules_scala//:scala_config.bzl", "scala_config")
 
 scala_config(
@@ -53,8 +52,9 @@ register_toolchains("//toolchains:my_scala_toolchain")
 
 local_repository(
     name = "bazel-bsp-rules",
-    path = "../../bazel_rules"
+    path = "../../bazel_rules",
 )
 
 load("@bazel-bsp-rules//:bazel_bsp_setup.bzl", "bazel_bsp_setup")
+
 bazel_bsp_setup()
