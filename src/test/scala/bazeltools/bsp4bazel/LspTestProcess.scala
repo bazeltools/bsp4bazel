@@ -35,6 +35,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration.FiniteDuration
 
 import bazeltools.bsp4bazel.IOLifts.{asIO, mapToIO}
+import bazeltools.bsp4bazel.protocol.WorkspaceBuildTargetsResult
 
 import bazeltools.bsp4bazel.Bsp4BazelApp
 import bazeltools.bsp4bazel.IOLifts
@@ -104,7 +105,10 @@ case class BspClient(
   def buildExit(params: Unit): IO[Unit] =
     sendNotification("build/exit", params)
 
-  // def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult]
+  def workspaceBuildTargets(
+      params: Unit
+  ): IO[DeferredSource[IO, WorkspaceBuildTargetsResult]] =
+    sendRequest("workspace/buildTargets", params)
 
   def buildTargetCompile(params: CompileParams): IO[DeferredSource[IO, Unit]] =
     sendRequest("buildTarget/compile", params)
@@ -143,6 +147,8 @@ object BspClient:
       def isUnit: Boolean = false
       def coerce: Option[A] = None
     }
+
+type Result = InitializeBuildResult | WorkspaceBuildTargetsResult | Unit
 
 /** Simulates client requests. Intended for test use only
   */
@@ -207,16 +213,22 @@ case class LspTestProcess(workspaceRoot: Path):
       client: BspClient,
       actions: List[Lsp.Action],
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
-  ): IO[List[InitializeBuildResult | Unit]] =
+  ): IO[List[Result]] =
     actions.traverse {
-      case Lsp.Action.Start           => start(client)
-      case Lsp.Action.Shutdown        => shutdown(client, exitSwitch)
-      case Lsp.Action.Compile(target) => compile(client, target)
+      case Lsp.Action.Start            => start(client)
+      case Lsp.Action.Shutdown         => shutdown(client, exitSwitch)
+      case Lsp.Action.WorkspaceTargets => workspaceTargets(client)
+      case Lsp.Action.Compile(target)  => compile(client, target)
     }
 
   def runIn(
       actions: List[Lsp.Action]
-  ): IO[(List[InitializeBuildResult | Unit], List[Notification])] =
+  ): IO[
+    (
+        List[Result],
+        List[Notification]
+    )
+  ] =
     for
       bspOutQ <- Queue.bounded[IO, String](1_000)
       bspErrQ <- Queue.bounded[IO, String](1_000)
@@ -277,6 +289,14 @@ case class LspTestProcess(workspaceRoot: Path):
       _ <- exitSwitch.complete(Right(()))
     yield ()
 
+  private def workspaceTargets(
+      client: BspClient
+  ): IO[WorkspaceBuildTargetsResult] =
+    for
+      dResp <- client.workspaceBuildTargets(())
+      resp <- dResp.get
+    yield resp
+
   private def compile(
       client: BspClient,
       target: BuildTargetIdentifier
@@ -302,20 +322,28 @@ case class Lsp(actions: Vector[Lsp.Action]):
   def compile(target: String): Lsp =
     this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target))
 
+  def workspaceTargets: Lsp =
+    this :+ Lsp.Action.WorkspaceTargets
+
   def shutdown: Lsp =
     this :+ Lsp.Action.Shutdown
 
   def runIn(
       workspaceRoot: Path
-  ): IO[(List[InitializeBuildResult | Unit], List[Notification])] =
+  ): IO[
+    (
+        List[Result],
+        List[Notification]
+    )
+  ] =
     LspTestProcess(workspaceRoot).runIn(actions.toList)
 
 object Lsp:
 
   def start: Lsp = Lsp(Vector.empty).start
 
-  sealed trait Action
-  object Action:
-    case object Start extends Action
-    case object Shutdown extends Action
-    case class Compile(target: BuildTargetIdentifier) extends Action
+  enum Action:
+    case Start
+    case Shutdown
+    case Compile(target: BuildTargetIdentifier)
+    case WorkspaceTargets

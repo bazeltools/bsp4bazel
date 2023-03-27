@@ -81,8 +81,8 @@ case class BuildTarget(
     data: Option[Json]
 )
 object BuildTarget:
-  given Encoder[BuildTarget] =
-    deriveEncoder[BuildTarget]
+  given Codec[BuildTarget] =
+    deriveCodec[BuildTarget]
 
 case class BuildTargetCapabilities(
     canCompile: Boolean,
@@ -233,8 +233,8 @@ object CompileParams:
 
 case class WorkspaceBuildTargetsResult(targets: List[BuildTarget])
 object WorkspaceBuildTargetsResult:
-  given Encoder[WorkspaceBuildTargetsResult] =
-    deriveEncoder[WorkspaceBuildTargetsResult]
+  given Codec[WorkspaceBuildTargetsResult] =
+    deriveCodec[WorkspaceBuildTargetsResult]
 
 case class ScalacOptionsParams(targets: List[BuildTargetIdentifier])
 object ScalacOptionsParams:
