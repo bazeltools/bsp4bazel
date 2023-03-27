@@ -2,8 +2,9 @@ package bazeltools.bsp4bazel.runner
 
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
-
 import bazeltools.bsp4bazel.runner.{BPath, BazelLabel, BazelTarget}
+import io.circe.syntax.*
+
 class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
 
   test("should create BazelTargets from strings") {
@@ -74,6 +75,28 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
     )
   }
 
+  test("should get last part of Bazel path") {
+    assertEquals(
+      BPath.fromString("a/b/c").toTry.get.last,
+      "c"
+    )
+
+    assertEquals(
+      BPath.fromString("a").toTry.get.last,
+      "a"
+    )
+
+    assertEquals(
+      BPath.fromString("a/...").toTry.get.last,
+      "..."
+    )
+
+    assertEquals(
+      BPath.BNil.last,
+      ""
+    )
+  }
+
   test("should create BazelLabels from strings") {
     def law(bl1: BazelLabel, bl2: BazelLabel): Unit =
       assertEquals(bl1, bl2)
@@ -139,6 +162,14 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
     forAll(BazelLabelTest.genBazelLabel) { bl1 =>
       val str = bl1.asString
       val bl2 = BazelLabel.fromString(str).toTry.get
+      assertEquals(bl1, bl2)
+    }
+  }
+
+  property("should round-trip paths as JSON") {
+    forAll(BazelLabelTest.genBazelLabel) { bl1 =>
+      val json = bl1.asJson
+      val bl2 = json.as[BazelLabel].toTry.get
       assertEquals(bl1, bl2)
     }
   }
