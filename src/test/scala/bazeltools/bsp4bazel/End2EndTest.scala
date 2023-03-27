@@ -74,7 +74,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
     .test("should compile with no errors") { (root, bazel) =>
 
-      val (_, notifications) = Lsp.start
+      val (_, notifications) = Lsp.start.workspaceTargets
         .compile("//...")
         .shutdown
         .runIn(root)
@@ -100,7 +100,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
   bazelEnv(projectRoot.resolve("examples/simple-with-errors"))
     .test("should compile and report 3 errors") { (root, bazel) =>
 
-      val (_, notifications) = Lsp.start
+      val (_, notifications) = Lsp.start.workspaceTargets
         .compile("//...")
         .shutdown
         .runIn(root)
