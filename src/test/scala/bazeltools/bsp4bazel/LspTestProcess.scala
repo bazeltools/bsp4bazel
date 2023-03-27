@@ -148,6 +148,8 @@ object BspClient:
       def coerce: Option[A] = None
     }
 
+type Result = InitializeBuildResult | WorkspaceBuildTargetsResult | Unit
+
 /** Simulates client requests. Intended for test use only
   */
 case class LspTestProcess(workspaceRoot: Path):
@@ -211,7 +213,7 @@ case class LspTestProcess(workspaceRoot: Path):
       client: BspClient,
       actions: List[Lsp.Action],
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
-  ): IO[List[InitializeBuildResult | WorkspaceBuildTargetsResult | Unit]] =
+  ): IO[List[Result]] =
     actions.traverse {
       case Lsp.Action.Start            => start(client)
       case Lsp.Action.Shutdown         => shutdown(client, exitSwitch)
@@ -223,7 +225,7 @@ case class LspTestProcess(workspaceRoot: Path):
       actions: List[Lsp.Action]
   ): IO[
     (
-        List[InitializeBuildResult | WorkspaceBuildTargetsResult | Unit],
+        List[Result],
         List[Notification]
     )
   ] =
@@ -330,7 +332,7 @@ case class Lsp(actions: Vector[Lsp.Action]):
       workspaceRoot: Path
   ): IO[
     (
-        List[InitializeBuildResult | WorkspaceBuildTargetsResult | Unit],
+        List[Result],
         List[Notification]
     )
   ] =
@@ -340,9 +342,8 @@ object Lsp:
 
   def start: Lsp = Lsp(Vector.empty).start
 
-  sealed trait Action
-  object Action:
-    case object Start extends Action
-    case object Shutdown extends Action
-    case class Compile(target: BuildTargetIdentifier) extends Action
-    case object WorkspaceTargets extends Action
+  enum Action:
+    case Start
+    case Shutdown
+    case Compile(target: BuildTargetIdentifier)
+    case WorkspaceTargets
