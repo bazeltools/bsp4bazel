@@ -13,6 +13,9 @@ import cats.parse.Parser0 as P0
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.annotation.tailrec
+import io.circe.Decoder
+import cats.syntax.all.*
+import io.circe.Encoder
 
 sealed trait BazelTarget:
   def asString: String = this match
@@ -53,6 +56,13 @@ sealed trait BPath:
 
   def asPath: Path =
     Paths.get(asString)
+
+  @annotation.tailrec
+  final def last: String = this match
+    case BPath.BCons(h, BNil) => h
+    case BPath.BCons(h, t)    => t.last
+    case BPath.Wildcard       => "..."
+    case BPath.BNil           => ""
 
   def asString: String = this match
     // Prevent trailing /
@@ -134,6 +144,11 @@ case class BazelLabel(
     target: Option[BazelTarget]
 ):
 
+  private def packageFile(suffix: String): Path =
+    val pack = this.packagePath.withoutWildcard
+    val last = pack.last
+    pack.asPath.resolve(s"$last$suffix")
+
   def withTarget(bt: BazelTarget): BazelLabel =
     copy(target = Some(bt))
 
@@ -177,3 +192,14 @@ object BazelLabel:
       .map { case ((r, p), t) =>
         BazelLabel(r, p, t.flatten)
       }
+
+  given Encoder[BazelLabel] =
+    Encoder[String].contramap(_.asString)
+
+  given Decoder[BazelLabel] =
+    Decoder[String].flatMap(str =>
+      BazelLabel.parse(str) match {
+        case Right(label) => Decoder.const(label)
+        case Left(err)    => Decoder.failedWithMessage(err.show)
+      }
+    )
