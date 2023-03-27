@@ -1,10 +1,8 @@
 load("@io_bazel_rules_scala//scala:scala_toolchain.bzl", "scala_toolchain")
-load("@io_bazel_rules_scala//scala:providers.bzl", "declare_deps_provider")
 
 scala_toolchain(
     name = "my_toolchain_impl",
     enable_diagnostics_report = True,
-    enable_semanticdb = True,
     visibility = ["//visibility:public"],
 )
 
