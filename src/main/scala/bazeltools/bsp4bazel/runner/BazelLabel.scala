@@ -57,7 +57,8 @@ sealed trait BPath:
   def asPath: Path =
     Paths.get(asString)
 
-  def last: String = this match
+  @annotation.tailrec
+  final def last: String = this match
     case BPath.BCons(h, BNil) => h
     case BPath.BCons(h, t)    => t.last
     case BPath.Wildcard       => "..."
