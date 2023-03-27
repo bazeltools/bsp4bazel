@@ -75,7 +75,9 @@ class Bsp4BazelServer(
         s.copy(
           targets = details.keys.toList,
           targetDetails = details,
-          targetSourceMap = Bsp4BazelServer.TargetSourceMap(ts)
+          targetSourceMap = Bsp4BazelServer.TargetSourceMap.fromTargetDetails(
+            details.values.toList
+          )
         )
       )
     yield ()
@@ -140,20 +142,22 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("buildTarget/scalacOptions")
       state <- stateRef.get
-      root <- state.workspaceRoot.asIO
+      workspaceRoot <- state.workspaceRoot.asIO
     yield
       val items = params.targets.map { target =>
         val details = state.targetDetails(target)
-        val semanticDbPath = root.resolve(".bsp/.semanticdb")
+        val semanticdbPath = workspaceRoot.resolve(".bsp/.semanticdb")
         ScalacOptionsItem(
           target,
           details.bspConfig.scalacOptions ++ List(
-            "-Xplugin:/vol/src/bsp4bazel/examples/simple-no-errors/bazel-out/k8-fastbuild/bin/external/org_scalameta_semanticdb_scalac/org_scalameta_semanticdb_scalac.stamp/semanticdb-scalac_2.12.14-4.7.3-stamped.jar",
-            "-P:semanticdb:sourceroot:/vol/src/bsp4bazel/examples/simple-no-errors",
-            "-P:semanticdb:targetroot:/vol/src/bsp4bazel/examples/simple-no-errors/.bsp/.semanticdb"
+            s"-Xplugin:${workspaceRoot.resolve(details.bspConfig.semanticdbJars.head).toString}",
+            s"-P:semanticdb:sourceroot:$workspaceRoot",
+            s"-P:semanticdb:targetroot:$semanticdbPath"
           ),
-          Nil,
-          UriFactory.fileUri(semanticDbPath)
+          details.bspConfig.classpath.map(p =>
+            UriFactory.fileUri(workspaceRoot.resolve(p))
+          ),
+          UriFactory.fileUri(semanticdbPath)
         )
       }
       ScalacOptionsResult(items)
@@ -248,7 +252,6 @@ class Bsp4BazelServer(
   private def compileTarget(target: BuildTargetIdentifier): IO[Unit] =
     for
       state <- stateRef.get
-      _ <- cats.effect.std.Console[IO].error(state.targetDetails)
       details <- state.targetDetails.get(target).asIO
       id <- IO.randomUUID.map(u => TaskId(u.toString, None))
       start <- IO.realTimeInstant
@@ -360,12 +363,12 @@ object Bsp4BazelServer:
 
   def defaultState: ServerState =
     ServerState(
+      Bsp4BazelServer.TargetSourceMap.empty,
+      Nil,
       None,
       None,
       Nil,
-      Map.empty,
-      BazelBspServer.TargetSourceMap.empty,
-      Nil
+      Map.empty
     )
 
   def create(client: BspClient, logger: Logger): IO[Bsp4BazelServer] =

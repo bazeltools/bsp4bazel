@@ -6,6 +6,7 @@ import bazeltools.bsp4bazel.protocol.BspServer
 import bazeltools.bsp4bazel.protocol.BuildTargetIdentifier
 import bazeltools.bsp4bazel.protocol.TextDocumentIdentifier
 import bazeltools.bsp4bazel.protocol.UriFactory
+import cats.data.ValidatedNel
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import cats.syntax.all._
@@ -33,8 +34,10 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
-import afenton.bazel.bsp.protocol.BspClient
 import cats.parse.SemVer
+import cats.data.Validated.Valid
+import cats.data.Validated.Invalid
+import cats.data.Validated
 
 trait BazelRunner:
   def compile(target: BazelLabel): Stream[IO, FileDiagnostics]
@@ -163,8 +166,20 @@ object BazelRunner:
       FilesIO.readJson[BspConfig](filePath)
 
     def bspConfig(target: BazelLabel): IO[BspConfig] =
-      runBazel(Command.Build, target).use_ *>
-        readBspTarget(target)
+      for
+        _ <- runBazel(Command.Build, target).use_
+        config <- readBspTarget(target)
+      // _ <- config
+      //   .verifyPaths(workspaceRoot)
+      //   .map(_.leftMap(_.toList.mkString(",")))
+      //   .flatMap {
+      //     case Valid(_) => IO.unit
+      //     case Invalid(err) =>
+      //       IO.raiseError(
+      //         new java.io.FileNotFoundException(s"Couldn't find Jars: $err")
+      //       )
+      //   }
+      yield config
 
     private def diagnostics: Stream[IO, FileDiagnostics] =
       FilesIO
@@ -211,17 +226,27 @@ object BazelRunner:
   case class BspConfig(
       scalaVersion: String,
       scalacOptions: List[String],
+      classpath: List[Path],
       compileJars: List[Path],
+      semanticdbJars: List[Path],
       sources: List[String],
       packages: List[String],
       compileLabel: BazelLabel
   ):
-    private lazy val jarMap: Map[String, Path] =
-      compileJars.map(p => (p.getFileName.toString, p)).toMap
 
     def majorScalaVersion: String = scalaVersion match
       case BspConfig.Pattern(major @ "2", minor, patch) => s"$major.$minor"
       case BspConfig.Pattern(major @ "3", minor, patch) => major
+
+    def verifyPaths(workspaceRoot: Path): IO[ValidatedNel[Path, Unit]] =
+      (classpath ++ compileJars ++ semanticdbJars)
+        .traverse { relPath =>
+          val path = workspaceRoot.resolve(relPath)
+          FilesIO
+            .exists(path)
+            .map(Validated.condNel(_, (), path))
+        }
+        .map(_.combineAll)
 
   object BspConfig:
     private val Pattern = raw"^(\d+)\.(\d+).(\d+)$$".r
@@ -230,14 +255,18 @@ object BazelRunner:
       for
         scalaVersion <- c.downField("scala_version").as[String]
         scalacOptions <- c.downField("scalac_options").as[List[String]]
+        classpath <- c.downField("classpath").as[List[Path]]
         compileJars <- c.downField("scala_compile_jars").as[List[Path]]
+        semanticdbJars <- c.downField("semanticdb_jars").as[List[Path]]
         sources <- c.downField("sources").as[List[String]]
         packages <- c.downField("packages").as[List[String]]
         compileLabel <- c.downField("compile_label").as[BazelLabel]
       yield BspConfig(
         scalaVersion,
         scalacOptions,
+        classpath,
         compileJars,
+        semanticdbJars,
         sources,
         packages,
         compileLabel

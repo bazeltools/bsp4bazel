@@ -35,7 +35,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration.FiniteDuration
 
 import bazeltools.bsp4bazel.IOLifts.{asIO, mapToIO}
-import afenton.bazel.bsp.protocol.WorkspaceBuildTargetsResult
+import bazeltools.bsp4bazel.protocol.WorkspaceBuildTargetsResult
 
 import bazeltools.bsp4bazel.Bsp4BazelApp
 import bazeltools.bsp4bazel.IOLifts
@@ -213,10 +213,10 @@ case class LspTestProcess(workspaceRoot: Path):
       exitSwitch: Deferred[IO, Either[Throwable, Unit]]
   ): IO[List[InitializeBuildResult | WorkspaceBuildTargetsResult | Unit]] =
     actions.traverse {
-      case Action.Start            => start(client)
-      case Action.Shutdown         => shutdown(client, exitSwitch)
-      case Action.WorkspaceTargets => workspaceTargets(client)
-      case Action.Compile(target)  => compile(client, target)
+      case Lsp.Action.Start            => start(client)
+      case Lsp.Action.Shutdown         => shutdown(client, exitSwitch)
+      case Lsp.Action.WorkspaceTargets => workspaceTargets(client)
+      case Lsp.Action.Compile(target)  => compile(client, target)
     }
 
   def runIn(

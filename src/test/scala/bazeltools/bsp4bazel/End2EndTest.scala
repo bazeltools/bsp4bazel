@@ -20,10 +20,10 @@ import io.circe.syntax.*
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration._
-import afenton.bazel.bsp.protocol.WorkspaceBuildTargetsResult
+import bazeltools.bsp4bazel.protocol.WorkspaceBuildTargetsResult
 import java.nio.file.Files
-import afenton.bazel.bsp.protocol.UriFactory
-import afenton.bazel.bsp.protocol.ScalaBuildTarget
+import bazeltools.bsp4bazel.protocol.UriFactory
+import bazeltools.bsp4bazel.protocol.ScalaBuildTarget
 
 import bazeltools.bsp4bazel.BspHelpers
 import bazeltools.bsp4bazel.Lsp
@@ -33,7 +33,7 @@ import bazeltools.bsp4bazel.Logger
 class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
   // Long, because Github actions can run slooooow at times
-  override val munitTimeout = 10.minute
+  override val munitTimeout = 2.minute
 
   val projectRoot = Paths.get("").toAbsolutePath
 
@@ -61,7 +61,6 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
     .test("should successfully initialize") { (root, bazel) =>
-
       val (responses, notifications) = Lsp.start.shutdown
         .runIn(root)
         .unsafeRunSync()
@@ -108,6 +107,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         assertEquals(
           sbt.jars.map(uri => Paths.get(uri).getFileName.toString).sorted,
           List(
+            "scala-compiler-2.12.14-stamped.jar",
             "scala-library-2.12.14-stamped.jar",
             "scala-reflect-2.12.14-stamped.jar"
           )
@@ -118,7 +118,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
     .test("should compile with no errors") { (root, bazel) =>
 
-      val (_, notifications) = Lsp.start
+      val (_, notifications) = Lsp.start.workspaceTargets
         .compile("//src:bsp_metadata_src_target")
         .shutdown
         .runIn(root)
@@ -144,7 +144,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
   bazelEnv(projectRoot.resolve("examples/simple-with-errors"))
     .test("should compile and report 3 errors") { (root, bazel) =>
 
-      val (_, notifications) = Lsp.start
+      val (_, notifications) = Lsp.start.workspaceTargets
         .compile("//src:bsp_metadata_src_target")
         .shutdown
         .runIn(root)

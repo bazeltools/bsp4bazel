@@ -256,7 +256,7 @@ object ScalacOptionsResult:
 case class ScalacOptionsItem(
     target: BuildTargetIdentifier,
     options: List[String],
-    classpath: List[String],
+    classpath: List[URI],
     classDirectory: URI
 )
 object ScalacOptionsItem:
