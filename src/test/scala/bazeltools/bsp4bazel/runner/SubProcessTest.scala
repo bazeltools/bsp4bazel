@@ -11,7 +11,7 @@ class SubProcessTest extends munit.CatsEffectSuite:
 
   test("should run a process until exit, and capture stdout/stderr") {
     val (ec1, errLen1, out1) = SubProcess
-      .from(Paths.get("/tmp"), "echo", "stdout")
+      .from(Paths.get("/tmp"), "/bin/echo", "stdout")
       .runUntilExit(Duration.Inf)
       .use { er =>
         for {
@@ -26,7 +26,7 @@ class SubProcessTest extends munit.CatsEffectSuite:
     assertEquals(out1, List("stdout", ""))
 
     val (ec2, err2) = SubProcess
-      .from(Paths.get("/tmp"), "ls", "doesnotexist")
+      .from(Paths.get("/tmp"), "/bin/ls", "doesnotexist")
       .runUntilExit(Duration.Inf)
       .use { er =>
         for {
@@ -44,9 +44,9 @@ class SubProcessTest extends munit.CatsEffectSuite:
 
   test("should run a process asynchronously, and stream stdout/stderr") {
     val sb = SubProcess
-      .from(Paths.get("/tmp"), "cat")
+      .from(Paths.get("/tmp"), "/bin/cat")
 
-    val EOT = '\u0004'
+    val EOT = 'E'
 
     val outIO = sb.start.use { process =>
       for
@@ -60,5 +60,4 @@ class SubProcessTest extends munit.CatsEffectSuite:
     }
 
     assertEquals(outIO.unsafeRunSync(), s"123")
-
   }
