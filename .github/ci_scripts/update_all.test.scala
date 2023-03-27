@@ -101,7 +101,7 @@ def bsp4bazel_setup():
     assertEquals(
       os.read(workingDir / "build.sbt"),
       s"""
-val scala3Version = "3.2.1"
+val scala3Version = "3.2.2"
 
 // <--- Updated automatically by release job
 val bsp4BazelVersion = "$newVersion"
@@ -177,7 +177,7 @@ More blah blah blah
 """.trim
 
   val BuildFile = """
-val scala3Version = "3.2.1"
+val scala3Version = "3.2.2"
 
 // <--- Updated automatically by release job
 val bsp4BazelVersion = "0.0.19"
