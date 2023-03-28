@@ -31,36 +31,100 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
+import bazeltools.bsp4bazel.runner.BazelRunner.Command
 
 trait BazelRunner:
-  def compile(target: BazelLabel): Stream[IO, FileDiagnostics]
+  def query(target: String): IO[BazelResult]
+  def build(target: BazelLabel): IO[BazelResult]
+  def run(target: BazelLabel): IO[BazelResult]
+  def test(target: BazelLabel): IO[BazelResult]
   def clean: IO[Unit]
   def shutdown: IO[Unit]
-  def targetSources(target: BazelLabel): IO[List[String]]
-  def bspTargets: IO[List[BspServer.Target]]
 
-object BazelRunner:
+case class BazelResult(
+    exitCode: BazelResult.ExitCode,
+    stdout: List[String],
+    stderr: List[String]
+):
+  def debugString =
+    s"""Bazel exited with: ${exitCode}
+    |stderr:
+    |${stderr.mkString("\n")}
+    |
+    |stdout:
+    |${stdout.mkString("\n")}
+    |""".stripMargin
+
+object BazelResult:
+
+  private def trim(strings: List[String]): List[String] =
+    if strings.isEmpty then Nil
+    else
+      val buf = strings.toBuffer
+      if (buf.head.isEmpty) then buf.dropInPlace(1)
+      if (buf.nonEmpty && buf.last.isEmpty) then buf.dropRightInPlace(1)
+      buf.toList
+
+  def fromExecutionResult(er: ExecutionResult): IO[BazelResult] =
+    for
+      so <- er.stdoutLines.compile.toList
+      se <- er.stderrLines.compile.toList
+    yield BazelResult(ExitCode.fromCode(er.exitCode), trim(so), trim(se))
 
   enum ExitCode(val code: Int):
     case Ok extends ExitCode(0)
     case BuildFailed extends ExitCode(1)
+    case InvalidCommandLine extends ExitCode(2)
+    case PartialFailure extends ExitCode(3)
+    case NoTestsFound extends ExitCode(4)
+    case QueryFailure extends ExitCode(7)
+    case BuildInterrupted extends ExitCode(8)
+    case ExternalEnvironmentFailure extends ExitCode(32)
+    case LocalEnvironmentalIssue extends ExitCode(36)
+    case InternalBazelError extends ExitCode(37)
+    case UnknownError(n: Int) extends ExitCode(n)
 
   object ExitCode:
-    def fromCode(code: Int): ExitCode = code match
-      case 0 => ExitCode.Ok
-      case 1 => ExitCode.BuildFailed
-      case code =>
-        throw new Exception(s"Bazel failed to run. Exited with code $code")
+    def fromCode(code: Int): ExitCode =
+      code match
+        case ExitCode.Ok.code =>
+          ExitCode.Ok
+        case ExitCode.BuildFailed.code =>
+          ExitCode.BuildFailed
+        case ExitCode.InvalidCommandLine.code =>
+          ExitCode.InvalidCommandLine
+        case ExitCode.PartialFailure.code =>
+          ExitCode.PartialFailure
+        case ExitCode.NoTestsFound.code =>
+          ExitCode.NoTestsFound
+        case ExitCode.QueryFailure.code =>
+          ExitCode.QueryFailure
+        case ExitCode.BuildInterrupted.code =>
+          ExitCode.BuildInterrupted
+        case ExitCode.ExternalEnvironmentFailure.code =>
+          ExitCode.ExternalEnvironmentFailure
+        case ExitCode.LocalEnvironmentalIssue.code =>
+          ExitCode.LocalEnvironmentalIssue
+        case ExitCode.InternalBazelError.code =>
+          ExitCode.InternalBazelError
+        case code =>
+          ExitCode.UnknownError(code)
+
+object BazelRunner:
 
   enum Command(val asString: String):
     case Query extends Command("query")
     case Build extends Command("build")
+    case Run extends Command("run")
     case Test extends Command("test")
     case Shutdown extends Command("shutdown")
     case Clean extends Command("clean")
 
-  def raiseIfUnxpectedExit(er: ExecutionResult, expected: ExitCode*): IO[Unit] =
-    if !expected.contains(ExitCode.fromCode(er.exitCode)) then
+  def raiseIfUnxpectedExit(
+      er: ExecutionResult,
+      expected: BazelResult.ExitCode*
+  ): IO[Unit] =
+    if !expected.contains(BazelResult.ExitCode.fromCode(er.exitCode)) then
       for
         err <- er.debugString
         _ <- IO.raiseError(BazelRunError(err, er.exitCode))
@@ -75,27 +139,23 @@ object BazelRunner:
     case class At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
     case object Default extends BazelWrapper("bazel")
 
-    def default(workspaceRoot: Path): IO[BazelWrapper] =
-      IO.blocking {
-        List(
-          At(workspaceRoot.resolve("bsp_bazel")),
-          At(workspaceRoot.resolve("bazel"))
-        )
-          .find(wr => Files.exists(wr.path))
-          .getOrElse(Default)
-      }
+  def default(
+      workspaceRoot: Path,
+      logger: Logger,
+      bazelWrapper: BazelWrapper
+  ): BazelRunner =
+    BazelRunnerImpl(workspaceRoot, logger, bazelWrapper)
 
   def default(
       workspaceRoot: Path,
-      bazelWrapper: BazelWrapper,
       logger: Logger
   ): BazelRunner =
-    BazelRunnerImpl(workspaceRoot, bazelWrapper, logger)
+    default(workspaceRoot, logger, BazelWrapper.Default)
 
   private case class BazelRunnerImpl(
       workspaceRoot: Path,
-      bazelWrapper: BazelWrapper,
-      logger: Logger
+      logger: Logger,
+      bazelWrapper: BazelWrapper
   ) extends BazelRunner:
 
     private def runBazel(
@@ -118,101 +178,36 @@ object BazelRunner:
         _ <- Resource.eval(logger.info(s"Exited with ${er.exitCode}"))
       yield er
 
-    private def runBazelOk(
+    private def runBazelExpectOk(
         command: Command,
         expr: Option[String]
     ): Resource[IO, ExecutionResult] =
       for
         er <- runBazel(command, expr)
-        _ <- Resource.eval(BazelRunner.raiseIfUnxpectedExit(er, ExitCode.Ok))
+        _ <- Resource.eval(
+          BazelRunner.raiseIfUnxpectedExit(er, BazelResult.ExitCode.Ok)
+        )
       yield er
 
-    private def runBazel(
-        command: Command,
-        label: BazelLabel
-    ): Resource[IO, ExecutionResult] =
-      runBazel(command, Some(label.asString))
+    def query(expr: String): IO[BazelResult] =
+      runBazel(Command.Query, Some(expr)).use(
+        BazelResult.fromExecutionResult(_)
+      )
 
-    def bspTargets: IO[List[BspServer.Target]] =
-      runBazelOk(Command.Query, Some("kind(bsp_target, //...)"))
-        .use { er =>
-          er.stdoutLines
-            .map(BazelLabel.fromString)
-            .collect { case Right(label) =>
-              BspServer.Target(
-                UriFactory.bazelUri(label.asString),
-                label.target.map(_.asString).getOrElse(label.asString)
-              )
-            }
-            .compile
-            .toList
-        }
+    def build(label: BazelLabel): IO[BazelResult] =
+      runBazel(Command.Build, Some(label.asString))
+        .use(BazelResult.fromExecutionResult(_))
+
+    def run(label: BazelLabel): IO[BazelResult] =
+      runBazel(Command.Run, Some(label.asString))
+        .use(BazelResult.fromExecutionResult(_))
+
+    def test(label: BazelLabel): IO[BazelResult] =
+      runBazel(Command.Test, Some(label.asString))
+        .use(BazelResult.fromExecutionResult(_))
 
     def shutdown: IO[Unit] =
-      runBazelOk(Command.Shutdown, None).use_
+      runBazelExpectOk(Command.Shutdown, None).use_
 
     def clean: IO[Unit] =
-      runBazelOk(Command.Clean, None).use_
-
-    private def readSourceFile(target: BazelLabel): IO[List[String]] =
-      val filePath = workspaceRoot
-        .resolve("bazel-bin")
-        .resolve(target.packagePath.asPath)
-        .resolve("sources.json")
-      FilesIO.readJson[BazelSources](filePath).map(_.sources)
-
-    def targetSources(target: BazelLabel): IO[List[String]] =
-      runBazel(Command.Build, target).use_ *>
-        readSourceFile(target)
-
-    private def diagnostics: Stream[IO, FileDiagnostics] =
-      FilesIO
-        .walk(
-          workspaceRoot.resolve("bazel-bin"),
-          Some("*.diagnosticsproto"),
-          100
-        )
-        .flatMap { file =>
-          Stream
-            .eval {
-              FilesIO.readBytes(file).map(TargetDiagnostics.parseFrom)
-            }
-            .flatMap { td =>
-              Stream.fromIterator(
-                td.diagnostics.iterator,
-                100
-              )
-            }
-        }
-
-    def compile(label: BazelLabel): Stream[IO, FileDiagnostics] =
-      Stream
-        .eval {
-          runBazel(Command.Build, label.allRulesResursive)
-            .use { er =>
-              BazelRunner
-                .raiseIfUnxpectedExit(
-                  er,
-                  ExitCode.Ok,
-                  ExitCode.BuildFailed
-                )
-                .as(er.exitCode)
-            }
-        }
-        .flatMap { exitCode =>
-          ExitCode.fromCode(exitCode) match
-            case ExitCode.BuildFailed => diagnostics
-            case _                    => Stream.empty
-        }
-
-  end BazelRunnerImpl
-
-  case class BazelSources(sources: List[String], buildFiles: List[String])
-
-  object BazelSources:
-    given Decoder[BazelSources] = Decoder.instance { c =>
-      for
-        sources <- c.downField("sources").as[List[String]]
-        buildFiles <- c.downField("buildFiles").as[List[String]]
-      yield BazelSources(sources, buildFiles)
-    }
+      runBazelExpectOk(Command.Clean, None).use_

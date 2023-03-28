@@ -45,12 +45,20 @@ rules_proto_toolchains()
 
 register_toolchains("//toolchains:my_scala_toolchain")
 
+# optional: setup ScalaTest toolchain and dependencies
+load("@io_bazel_rules_scala//testing:scalatest.bzl", "scalatest_repositories", "scalatest_toolchain")
+
+scalatest_repositories()
+
+scalatest_toolchain()
+
 # Load bsp4bazel-rules
 
 local_repository(
     name = "bsp4bazel-rules",
-    path = "../../bazel_rules"
+    path = "../../bazel_rules",
 )
 
 load("@bsp4bazel-rules//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+
 bsp4bazel_setup()

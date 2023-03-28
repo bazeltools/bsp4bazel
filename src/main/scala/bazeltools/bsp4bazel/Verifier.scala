@@ -7,7 +7,7 @@ import cats.syntax.all.*
 import fs2.io.file.Files
 import fs2.io.file.Path
 import bazeltools.bsp4bazel.runner.BazelRunner
-import bazeltools.bsp4bazel.runner.BazelRunner.BazelWrapper
+import bazeltools.bsp4bazel.runner.BspBazelRunner
 import cats.data.EitherT
 
 import bazeltools.bsp4bazel.Logger
@@ -16,11 +16,9 @@ object Verifier:
 
   lazy val Cwd = Path("")
 
-  lazy val runner: IO[BazelRunner] =
-    for wrapper <- BazelWrapper.default(Cwd.toNioPath)
-    yield BazelRunner.default(
+  lazy val runner: BspBazelRunner =
+    BspBazelRunner.default(
       Cwd.toNioPath.toAbsolutePath,
-      wrapper,
       Logger.noOp
     )
 
@@ -36,8 +34,6 @@ object Verifier:
 
     val et =
       for
-        wrapper <- BazelWrapper.default(Cwd.toNioPath).attemptT
-        runner <- runner.attemptT
         targets <- runner.bspTargets.attemptT
         result <- EitherT.cond(!targets.isEmpty, (), new Exception(msg))
       yield result
