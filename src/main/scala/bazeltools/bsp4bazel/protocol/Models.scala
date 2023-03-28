@@ -65,10 +65,10 @@ object ScalaPlatform:
 
   given Encoder[ScalaPlatform] = Encoder.instance(sp => sp.id.asJson)
 
-  given Decoder[ScalaPlatform] = Decoder[Int].map {
-    case 1 => ScalaPlatform.JVM
-    case 2 => ScalaPlatform.JS
-    case 3 => ScalaPlatform.Native
+  given Decoder[ScalaPlatform] = Decoder[Int].emap { id =>
+    ScalaPlatform.values
+      .find(_.id == id)
+      .toRight(s"Unknown ScalaPlatform $id")
   }
 
 case class JvmBuildTarget(javaHome: Option[URI], javaVersion: Option[String])
@@ -208,15 +208,16 @@ enum StatusCode(val id: Int):
   case Ok extends StatusCode(1)
   case Error extends StatusCode(2)
   case Cancelled extends StatusCode(3)
+
 object StatusCode:
   given Encoder[StatusCode] =
     Encoder.instance(_.id.asJson)
-  given Decoder[StatusCode] =
-    Decoder[Int].map {
-      case 1 => StatusCode.Ok
-      case 2 => StatusCode.Error
-      case 3 => StatusCode.Cancelled
-    }
+
+  given Decoder[StatusCode] = Decoder[Int].emap { id =>
+    StatusCode.values
+      .find(_.id == id)
+      .toRight(s"Unknown StatusCode $id")
+  }
 
 case class TaskFinishParams(
     taskId: TaskId,
@@ -314,11 +315,11 @@ object SourceItemKind:
   given Encoder[SourceItemKind] =
     Encoder.instance(_.id.asJson)
 
-  given Decoder[SourceItemKind] =
-    Decoder[Int].map {
-      case 1 => SourceItemKind.File
-      case 2 => SourceItemKind.Directory
-    }
+  given Decoder[SourceItemKind] = Decoder[Int].emap { id =>
+    SourceItemKind.values
+      .find(_.id == id)
+      .toRight(s"Unknown SourceItemKind $id")
+  }
 
 case class DependencySourcesParams(targets: List[BuildTargetIdentifier])
 object DependencySourcesParams:
@@ -459,38 +460,37 @@ object Location:
   given Codec[Location] =
     deriveCodec[Location]
 
-enum DiagnosticTag(val i: Int):
+enum DiagnosticTag(val id: Int):
   case Unnecessary extends DiagnosticTag(1)
   case Deprecated extends DiagnosticTag(2)
 
 object DiagnosticTag:
 
   given Encoder[DiagnosticTag] =
-    Encoder.instance(dt => dt.i.asJson)
+    Encoder.instance(dt => dt.id.asJson)
 
-  given Decoder[DiagnosticTag] =
-    Decoder[Int].map {
-      case 1 => DiagnosticTag.Unnecessary
-      case 2 => DiagnosticTag.Deprecated
-    }
+  given Decoder[DiagnosticTag] = Decoder[Int].emap { id =>
+    DiagnosticTag.values
+      .find(_.id == id)
+      .toRight(s"Unknown DiagnosticTag $id")
+  }
 
-enum DiagnosticSeverity(val i: Int):
+enum DiagnosticSeverity(val id: Int):
   case Error extends DiagnosticSeverity(1)
   case Warning extends DiagnosticSeverity(2)
   case Information extends DiagnosticSeverity(3)
   case Hint extends DiagnosticSeverity(4)
+
 object DiagnosticSeverity:
 
   given Encoder[DiagnosticSeverity] =
-    Encoder.instance(ds => ds.i.asJson)
+    Encoder.instance(ds => ds.id.asJson)
 
-  given Decoder[DiagnosticSeverity] =
-    Decoder[Int].map {
-      case 1 => DiagnosticSeverity.Error
-      case 2 => DiagnosticSeverity.Warning
-      case 3 => DiagnosticSeverity.Information
-      case 4 => DiagnosticSeverity.Hint
-    }
+  given Decoder[DiagnosticSeverity] = Decoder[Int].emap { id =>
+    DiagnosticSeverity.values
+      .find(_.id == id)
+      .toRight(s"Unknown DiagnosticSeverity $id")
+  }
 
   def fromScalacSeverity(sv: ScalacSeverity): DiagnosticSeverity =
     sv match {
@@ -584,11 +584,10 @@ enum MessageType(val id: Int):
 
 object MessageType:
   given Encoder[MessageType] = Encoder.instance(_.id.asJson)
-  given Decoder[MessageType] = Decoder[Int].map {
-    case 1 => MessageType.Error
-    case 2 => MessageType.Warning
-    case 3 => MessageType.Info
-    case 4 => MessageType.Log
+  given Decoder[MessageType] = Decoder[Int].emap { i =>
+    MessageType.values
+      .find(mt => mt.id == i)
+      .toRight(s"Unknown message type $i")
   }
 
 enum TaskDataKind(val id: String):
@@ -601,13 +600,8 @@ enum TaskDataKind(val id: String):
 
 object TaskDataKind:
   given Encoder[TaskDataKind] = Encoder.instance(_.id.asJson)
-  given Decoder[TaskDataKind] = Decoder[String].map {
-    case "compile-task"   => TaskDataKind.CompileTask
-    case "compile-report" => TaskDataKind.CompileReport
-    case "test-task"      => TaskDataKind.TestTask
-    case "test-report"    => TaskDataKind.TestReport
-    case "test-start"     => TaskDataKind.TestStart
-    case "test-finish"    => TaskDataKind.TestFinish
+  given Decoder[TaskDataKind] = Decoder[String].emap { id =>
+    TaskDataKind.values.find(_.id == id).toRight(s"Unknown TaskDataKind $id")
   }
 
 case class CompileTask(target: BuildTargetIdentifier)
