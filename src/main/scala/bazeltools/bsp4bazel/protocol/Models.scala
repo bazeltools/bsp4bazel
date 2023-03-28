@@ -45,29 +45,36 @@ object BuildTargetIdentifier:
   def file(uri: String): BuildTargetIdentifier =
     BuildTargetIdentifier(UriFactory.fileUri(uri))
 
-case class ScalaBuilderTarget(
+case class ScalaBuildTarget(
     scalaOrganization: String,
     scalaVersion: String,
     scalaBinaryVersion: String,
     platform: ScalaPlatform,
-    jars: List[String],
+    jars: List[URI],
     jvmBuildTarget: Option[JvmBuildTarget]
 )
-object ScalaBuilderTarget:
-  given Encoder[ScalaBuilderTarget] =
-    deriveEncoder[ScalaBuilderTarget]
+object ScalaBuildTarget:
+  given Codec[ScalaBuildTarget] =
+    deriveCodec[ScalaBuildTarget]
 
 enum ScalaPlatform(val id: Int):
   case JVM extends ScalaPlatform(1)
   case JS extends ScalaPlatform(2)
   case Native extends ScalaPlatform(3)
 object ScalaPlatform:
+
   given Encoder[ScalaPlatform] = Encoder.instance(sp => sp.id.asJson)
+
+  given Decoder[ScalaPlatform] = Decoder[Int].map {
+    case 1 => ScalaPlatform.JVM
+    case 2 => ScalaPlatform.JS
+    case 3 => ScalaPlatform.Native
+  }
 
 case class JvmBuildTarget(javaHome: Option[URI], javaVersion: Option[String])
 object JvmBuildTarget:
-  given Encoder[JvmBuildTarget] =
-    deriveEncoder[JvmBuildTarget]
+  given Codec[JvmBuildTarget] =
+    deriveCodec[JvmBuildTarget]
 
 case class BuildTarget(
     id: BuildTargetIdentifier,
@@ -91,8 +98,8 @@ case class BuildTargetCapabilities(
     canDebug: Boolean
 )
 object BuildTargetCapabilities:
-  given Decoder[BuildTargetCapabilities] =
-    deriveDecoder[BuildTargetCapabilities]
+  given Codec[BuildTargetCapabilities] =
+    deriveCodec[BuildTargetCapabilities]
 
 case class InitializeBuildParams(
     displayName: String,
@@ -238,33 +245,33 @@ object WorkspaceBuildTargetsResult:
 
 case class ScalacOptionsParams(targets: List[BuildTargetIdentifier])
 object ScalacOptionsParams:
-  given Decoder[ScalacOptionsParams] =
-    deriveDecoder[ScalacOptionsParams]
+  given Codec[ScalacOptionsParams] =
+    deriveCodec[ScalacOptionsParams]
 
 case class ScalacOptionsResult(items: List[ScalacOptionsItem])
 object ScalacOptionsResult:
-  given Encoder[ScalacOptionsResult] =
-    deriveEncoder[ScalacOptionsResult]
+  given Codec[ScalacOptionsResult] =
+    deriveCodec[ScalacOptionsResult]
 
 case class ScalacOptionsItem(
     target: BuildTargetIdentifier,
     options: List[String],
-    classpath: List[String],
-    classDirectory: String
+    classpath: List[URI],
+    classDirectory: URI
 )
 object ScalacOptionsItem:
-  given Encoder[ScalacOptionsItem] =
-    deriveEncoder[ScalacOptionsItem]
+  given Codec[ScalacOptionsItem] =
+    deriveCodec[ScalacOptionsItem]
 
 case class JavacOptionsParams(targets: List[BuildTargetIdentifier])
 object JavacOptionsParams:
-  given Decoder[JavacOptionsParams] =
-    deriveDecoder[JavacOptionsParams]
+  given Codec[JavacOptionsParams] =
+    deriveCodec[JavacOptionsParams]
 
 case class JavacOptionsResult(items: List[JavacOptionsItem])
 object JavacOptionsResult:
-  given Encoder[JavacOptionsResult] =
-    deriveEncoder[JavacOptionsResult]
+  given Codec[JavacOptionsResult] =
+    deriveCodec[JavacOptionsResult]
 
 case class JavacOptionsItem(
     target: BuildTargetIdentifier,
@@ -273,18 +280,18 @@ case class JavacOptionsItem(
     classDirectory: String
 )
 object JavacOptionsItem:
-  given Encoder[JavacOptionsItem] =
-    deriveEncoder[JavacOptionsItem]
+  given Codec[JavacOptionsItem] =
+    deriveCodec[JavacOptionsItem]
 
 case class SourcesParams(targets: List[BuildTargetIdentifier])
 object SourcesParams:
-  given Decoder[SourcesParams] =
-    deriveDecoder[SourcesParams]
+  given Codec[SourcesParams] =
+    deriveCodec[SourcesParams]
 
 case class SourcesResult(items: List[SourcesItem])
 object SourcesResult:
-  given Encoder[SourcesResult] =
-    deriveEncoder[SourcesResult]
+  given Codec[SourcesResult] =
+    deriveCodec[SourcesResult]
 
 case class SourcesItem(
     target: BuildTargetIdentifier,
@@ -292,13 +299,13 @@ case class SourcesItem(
     roots: Option[List[String]]
 )
 object SourcesItem:
-  given Encoder[SourcesItem] =
-    deriveEncoder[SourcesItem]
+  given Codec[SourcesItem] =
+    deriveCodec[SourcesItem]
 
 case class SourceItem(uri: URI, kind: SourceItemKind, generated: Boolean)
 object SourceItem:
-  given Encoder[SourceItem] =
-    deriveEncoder[SourceItem]
+  given Codec[SourceItem] =
+    deriveCodec[SourceItem]
 
 enum SourceItemKind(val id: Int):
   case File extends SourceItemKind(1)
@@ -307,47 +314,53 @@ object SourceItemKind:
   given Encoder[SourceItemKind] =
     Encoder.instance(_.id.asJson)
 
+  given Decoder[SourceItemKind] =
+    Decoder[Int].map {
+      case 1 => SourceItemKind.File
+      case 2 => SourceItemKind.Directory
+    }
+
 case class DependencySourcesParams(targets: List[BuildTargetIdentifier])
 object DependencySourcesParams:
-  given Decoder[DependencySourcesParams] =
-    deriveDecoder[DependencySourcesParams]
+  given Codec[DependencySourcesParams] =
+    deriveCodec[DependencySourcesParams]
 
 case class DependencySourcesResult(items: List[DependencySourcesItem])
 object DependencySourcesResult:
-  given Encoder[DependencySourcesResult] =
-    deriveEncoder[DependencySourcesResult]
+  given Codec[DependencySourcesResult] =
+    deriveCodec[DependencySourcesResult]
 
 case class DependencySourcesItem(
     target: BuildTargetIdentifier,
     sources: List[String]
 )
 object DependencySourcesItem:
-  given Encoder[DependencySourcesItem] =
-    deriveEncoder[DependencySourcesItem]
+  given Codec[DependencySourcesItem] =
+    deriveCodec[DependencySourcesItem]
 
 case class ScalaMainClassesParams(
     targets: List[BuildTargetIdentifier],
     origin: Option[String]
 )
 object ScalaMainClassesParams:
-  given Decoder[ScalaMainClassesParams] =
-    deriveDecoder[ScalaMainClassesParams]
+  given Codec[ScalaMainClassesParams] =
+    deriveCodec[ScalaMainClassesParams]
 
 case class ScalaMainClassesResult(
     items: List[ScalaMainClassesItem],
     origin: Option[String]
 )
 object ScalaMainClassesResult:
-  given Encoder[ScalaMainClassesResult] =
-    deriveEncoder[ScalaMainClassesResult]
+  given Codec[ScalaMainClassesResult] =
+    deriveCodec[ScalaMainClassesResult]
 
 case class ScalaMainClassesItem(
     target: BuildTargetIdentifier,
     classes: List[ScalaMainClass]
 )
 object ScalaMainClassesItem:
-  given Encoder[ScalaMainClassesItem] =
-    deriveEncoder[ScalaMainClassesItem]
+  given Codec[ScalaMainClassesItem] =
+    deriveCodec[ScalaMainClassesItem]
 
 case class ScalaMainClass(
     `class`: String,
@@ -356,8 +369,8 @@ case class ScalaMainClass(
     environmentVariables: Option[List[String]]
 )
 object ScalaMainClass:
-  given Encoder[ScalaMainClass] =
-    deriveEncoder[ScalaMainClass]
+  given Codec[ScalaMainClass] =
+    deriveCodec[ScalaMainClass]
 
 case class PublishDiagnosticsParams(
     textDocument: TextDocumentIdentifier,
@@ -534,25 +547,25 @@ object Position:
 
 case class InverseSourcesParams(textDocument: TextDocumentIdentifier)
 object InverseSourcesParams:
-  given Decoder[InverseSourcesParams] = deriveDecoder[InverseSourcesParams]
+  given Codec[InverseSourcesParams] = deriveCodec[InverseSourcesParams]
 
 case class InverseSourcesResult(targets: List[BuildTargetIdentifier])
 object InverseSourcesResult:
-  given Encoder[InverseSourcesResult] = deriveEncoder[InverseSourcesResult]
+  given Codec[InverseSourcesResult] = deriveCodec[InverseSourcesResult]
 
   def empty: InverseSourcesResult = InverseSourcesResult(Nil)
 
 case class CleanCacheParams(targets: List[BuildTargetIdentifier])
 object CleanCacheParams:
-  given Decoder[CleanCacheParams] = deriveDecoder[CleanCacheParams]
+  given Codec[CleanCacheParams] = deriveCodec[CleanCacheParams]
 
 case class CleanCacheResult(message: Option[String], cleaned: Boolean)
 object CleanCacheResult:
-  given Encoder[CleanCacheResult] = deriveEncoder[CleanCacheResult]
+  given Codec[CleanCacheResult] = deriveCodec[CleanCacheResult]
 
 case class CancelParams(id: Option[Int | String])
 object CancelParams:
-  given Decoder[CancelParams] = deriveDecoder[CancelParams]
+  given Codec[CancelParams] = deriveCodec[CancelParams]
 
 case class ShowMessageParams(
     `type`: MessageType,
@@ -561,7 +574,7 @@ case class ShowMessageParams(
     message: String
 )
 object ShowMessageParams:
-  given Encoder[ShowMessageParams] = deriveEncoder[ShowMessageParams]
+  given Codec[ShowMessageParams] = deriveCodec[ShowMessageParams]
 
 enum MessageType(val id: Int):
   case Error extends MessageType(1)
@@ -571,6 +584,12 @@ enum MessageType(val id: Int):
 
 object MessageType:
   given Encoder[MessageType] = Encoder.instance(_.id.asJson)
+  given Decoder[MessageType] = Decoder[Int].map {
+    case 1 => MessageType.Error
+    case 2 => MessageType.Warning
+    case 3 => MessageType.Info
+    case 4 => MessageType.Log
+  }
 
 enum TaskDataKind(val id: String):
   case CompileTask extends TaskDataKind("compile-task")
@@ -593,7 +612,7 @@ object TaskDataKind:
 
 case class CompileTask(target: BuildTargetIdentifier)
 object CompileTask:
-  given Encoder[CompileTask] = deriveEncoder[CompileTask]
+  given Codec[CompileTask] = deriveCodec[CompileTask]
 
 case class CompileReport(
     target: BuildTargetIdentifier,
@@ -604,4 +623,4 @@ case class CompileReport(
     noOp: Option[Boolean]
 )
 object CompileReport:
-  given Encoder[CompileReport] = deriveEncoder[CompileReport]
+  given Codec[CompileReport] = deriveCodec[CompileReport]
