@@ -128,7 +128,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
 
         case MiniDiagnostic(Range(start, end), _, "not found: type IntZ") =>
           assertEquals(start, Position(5, 18))
-          assertEquals(end, Position(6, 0))
+          assertEquals(end, Position(5, 22))
 
         case d => fail(s"Wasn't expecting diagnostic $d")
       }
@@ -136,7 +136,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
       notifications.selectDiagnostics("Bar.scala").foreach {
         case MiniDiagnostic(Range(start, end), _, "not found: type StringQ") =>
           assertEquals(start, Position(3, 18))
-          assertEquals(end, Position(4, 0))
+          assertEquals(end, Position(3, 25))
 
         case d => fail(s"Wasn't expecting diagnostic $d")
       }

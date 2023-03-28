@@ -118,7 +118,7 @@ class Bsp4BazelServer(
       Nil,
       Some("scala"),
       Some(
-        ScalaBuilderTarget(
+        ScalaBuildTarget(
           "org.scala-lang",
           "2.12",
           "2.12",

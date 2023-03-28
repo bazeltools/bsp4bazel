@@ -9,23 +9,22 @@ http_archive(
     url = "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/{}/bazel-skylib-{}.tar.gz".format(skylib_version, skylib_version),
 )
 
-rules_scala_version = "c711b4d1f0d1cc386c63ef748c9df14d2f3a187e"
+rules_scala_version = "9ddca47d8f81af2204f725547eb550a5c89820b0"
 
 http_archive(
     name = "io_bazel_rules_scala",
-    sha256 = "556677f505634da64efc41912d280895e61f5da109d82bdee41cde4120a190a1",
+    sha256 = "4d20d5899979fb6d4f47d1abcd919f376b978ef3709e18f68a227e8c8e43cdbe",
     strip_prefix = "rules_scala-%s" % rules_scala_version,
     type = "zip",
-    url = "https://github.com/bazelbuild/rules_scala/archive/%s.zip" % rules_scala_version,
+    url = "https://github.com/aishfenton/rules_scala/archive/%s.zip" % rules_scala_version,
 )
 
 # Stores Scala version and other configuration
 # 2.12 is a default version, other versions can be use by passing them explicitly:
-# scala_config(scala_version = "2.11.12")
 load("@io_bazel_rules_scala//:scala_config.bzl", "scala_config")
 
 scala_config(
-    # scala_version = "2.12.",
+    scala_version = "2.12.14",
 )
 
 load("@io_bazel_rules_scala//scala:scala.bzl", "rules_scala_setup", "rules_scala_toolchain_deps_repositories")
@@ -42,6 +41,10 @@ load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_
 rules_proto_dependencies()
 
 rules_proto_toolchains()
+
+load("@io_bazel_rules_scala//scala/semanticdb:semanticdb_repositories.bzl", "semanticdb_repositories")
+
+semanticdb_repositories()
 
 register_toolchains("//toolchains:my_scala_toolchain")
 
