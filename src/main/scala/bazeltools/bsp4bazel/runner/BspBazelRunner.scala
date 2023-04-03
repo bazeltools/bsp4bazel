@@ -32,6 +32,9 @@ import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
 
+/** Wrapper around BazelRunner for handling `./bazel_rules` rules. Specifically,
+  * it handles listing bsp_targets, reading their config, and compiling them
+  */
 object BspBazelRunner:
 
   def default(

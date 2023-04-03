@@ -6,6 +6,7 @@ import bazeltools.bsp4bazel.protocol.BspServer
 import bazeltools.bsp4bazel.protocol.BuildTargetIdentifier
 import bazeltools.bsp4bazel.protocol.TextDocumentIdentifier
 import bazeltools.bsp4bazel.protocol.UriFactory
+import bazeltools.bsp4bazel.runner.BazelRunner.Command
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import cats.syntax.all._
@@ -31,8 +32,10 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Success.apply
 import scala.util.Try
-import bazeltools.bsp4bazel.runner.BazelRunner.Command
 
+/** Generic Bazel runner (independent of Bsp or any particular being assumed
+  * rules)
+  */
 trait BazelRunner:
   def query(target: String): IO[BazelResult]
   def build(target: BazelLabel): IO[BazelResult]
