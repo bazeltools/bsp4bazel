@@ -37,7 +37,6 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
     setup = { test =>
       val br = BazelRunner.default(
         workspaceRoot,
-        BazelRunner.BazelWrapper.default(workspaceRoot).unsafeRunSync(),
         Logger.noOp
       )
       (br.shutdown >> br.clean).unsafeRunSync()

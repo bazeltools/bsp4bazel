@@ -6,6 +6,7 @@ import bazeltools.bsp4bazel.jrpc.Notification
 import bazeltools.bsp4bazel.protocol.*
 import bazeltools.bsp4bazel.runner.BazelLabel
 import bazeltools.bsp4bazel.runner.BazelRunner
+import bazeltools.bsp4bazel.runner.BspBazelRunner
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.Queue
@@ -39,12 +40,15 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("buildInitialize")
       workspaceRoot = Paths.get(params.rootUri)
-      bazelWrapper <- BazelRunner.BazelWrapper.default(workspaceRoot)
       _ <- stateRef.update(state =>
         state.copy(
           workspaceRoot = Some(workspaceRoot),
-          bazelRunner =
-            Some(BazelRunner.default(workspaceRoot, bazelWrapper, logger))
+          bspBazelRunner = Some(
+            BspBazelRunner.default(
+              workspaceRoot,
+              logger
+            )
+          )
         )
       )
       resp <- IO.pure {
@@ -69,7 +73,7 @@ class Bsp4BazelServer(
       state <- stateRef.get
       root <- state.workspaceRoot.asIO
       ws <- workspaceBuildTargets(())
-      ts <- state.bazelRunner.mapToIO { runner =>
+      ts <- state.bspBazelRunner.mapToIO { runner =>
         doBuildTargetSources(
           root,
           runner,
@@ -129,7 +133,7 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("workspace/buildTargets")
       state <- stateRef.get
-      runner <- state.bazelRunner.asIO
+      runner <- state.bspBazelRunner.asIO
       root <- state.workspaceRoot.asIO
       bspTargets <- runner.bspTargets
     yield WorkspaceBuildTargetsResult(
@@ -154,7 +158,7 @@ class Bsp4BazelServer(
 
   private def doCompile(
       workspaceRoot: Path,
-      bazelRunner: BazelRunner,
+      bazelRunner: BspBazelRunner,
       target: BuildTargetIdentifier,
       id: TaskId
   ): IO[List[FileDiagnostics]] =
@@ -229,7 +233,7 @@ class Bsp4BazelServer(
         )
       )
       state <- stateRef.get
-      runner <- state.bazelRunner.asIO
+      runner <- state.bspBazelRunner.asIO
       fds <- state.workspaceRoot.mapToIO { root =>
         doCompile(root, runner, target, id)
       }
@@ -267,7 +271,7 @@ class Bsp4BazelServer(
 
   private def doBuildTargetSources(
       workspaceRoot: Path,
-      bazelRunner: BazelRunner,
+      bazelRunner: BspBazelRunner,
       targets: List[BuildTargetIdentifier]
   ): IO[Map[BuildTargetIdentifier, List[TextDocumentIdentifier]]] =
     targets
@@ -332,7 +336,7 @@ object Bsp4BazelServer:
       targetSourceMap: Bsp4BazelServer.TargetSourceMap,
       currentErrors: List[FileDiagnostics],
       workspaceRoot: Option[Path],
-      bazelRunner: Option[BazelRunner],
+      bspBazelRunner: Option[BspBazelRunner],
       targets: List[BuildTarget]
   )
 
