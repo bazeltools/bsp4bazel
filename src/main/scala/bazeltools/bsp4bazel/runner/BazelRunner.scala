@@ -140,7 +140,7 @@ object BazelRunner:
   sealed trait BazelWrapper(val command: String)
   object BazelWrapper:
     case class At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
-    case object Default extends BazelWrapper("bazel")
+    case object Default extends BazelWrapper("./bazel")
 
   def default(
       workspaceRoot: Path,

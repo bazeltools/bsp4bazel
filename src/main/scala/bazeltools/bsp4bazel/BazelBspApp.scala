@@ -187,3 +187,4 @@ object Bsp4BazelApp
         .onFinalize(Console[IO].errorln("👋 BSP Server Shutting Down"))
       _ <- all.compile.drain
     yield ExitCode.Success
+
