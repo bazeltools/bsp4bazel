@@ -1,4 +1,4 @@
-val scala3Version = "3.3.0"
+val scala3Version = "3.3.1"
 
 enablePlugins(GraalVMNativeImagePlugin)
 enablePlugins(BuildInfoPlugin)
@@ -15,8 +15,8 @@ lazy val root = project
     version := bsp4BazelVersion,
     scalaVersion := scala3Version,
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.5.2",
-    libraryDependencies += "co.fs2" %% "fs2-core" % "3.8.0",
-    libraryDependencies += "co.fs2" %% "fs2-io" % "3.8.0",
+    libraryDependencies += "co.fs2" %% "fs2-core" % "3.9.2",
+    libraryDependencies += "co.fs2" %% "fs2-io" % "3.9.2",
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.6",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.6",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.6",
