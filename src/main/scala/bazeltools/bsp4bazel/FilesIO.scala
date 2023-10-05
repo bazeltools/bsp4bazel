@@ -45,14 +45,15 @@ object FilesIO:
       glob: Option[String] = None,
       maxDepth: Int = 100
   ): Stream[IO, Path] =
-    val paths = Stream
-      .fromIterator[IO](
-        Files
+    // Files.walk could start doing IO
+    val itIO = IO.blocking(Files
           .walk(root, maxDepth, FileVisitOption.FOLLOW_LINKS)
           .iterator
-          .asScala,
-        100
-      )
+          .asScala)
+
+    val paths =
+      Stream.eval(itIO)
+        .flatMap(Stream.fromIterator[IO](_, 100))
 
     glob match
       case Some(glob) =>
