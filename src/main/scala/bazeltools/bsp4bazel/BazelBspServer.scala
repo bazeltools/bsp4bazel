@@ -54,14 +54,15 @@ class Bsp4BazelServer(
       )
       compileProvider = CompileProvider(List("scala"))
     yield InitializeBuildResult(
-          "Bazel",
-          BuildInfo.version,
-          BuildInfo.bspVersion,
-          BuildServerCapabilities(
-            compileProvider = Some(compileProvider),
-            inverseSourcesProvider = Some(true),
-            canReload = Some(true)
-          ))
+      "Bazel",
+      BuildInfo.version,
+      BuildInfo.bspVersion,
+      BuildServerCapabilities(
+        compileProvider = Some(compileProvider),
+        inverseSourcesProvider = Some(true),
+        canReload = Some(true)
+      )
+    )
 
   def buildInitialized(params: Unit): IO[Unit] =
     for
@@ -139,15 +140,13 @@ class Bsp4BazelServer(
   def buildTargetScalacOptions(
       params: ScalacOptionsParams
   ): IO[ScalacOptionsResult] =
-    for
-      _ <- logger.info("buildTarget/scalacOptions")
+    for _ <- logger.info("buildTarget/scalacOptions")
     yield ScalacOptionsResult(Nil)
 
   def buildTargetJavacOptions(
       params: JavacOptionsParams
   ): IO[JavacOptionsResult] =
-    for
-      _ <- logger.info("buildTarget/javacOptions")
+    for _ <- logger.info("buildTarget/javacOptions")
     yield JavacOptionsResult(Nil)
 
   private def doCompile(
@@ -300,15 +299,13 @@ class Bsp4BazelServer(
   def buildTargetDependencySources(
       params: DependencySourcesParams
   ): IO[DependencySourcesResult] =
-    for
-      _ <- logger.info("buildTarget/dependencySources")
+    for _ <- logger.info("buildTarget/dependencySources")
     yield DependencySourcesResult(Nil)
 
   def buildTargetScalaMainClasses(
       params: ScalaMainClassesParams
   ): IO[ScalaMainClassesResult] =
-    for
-      _ <- logger.info("buildTarget/scalaMainClasses")
+    for _ <- logger.info("buildTarget/scalaMainClasses")
     yield ScalaMainClassesResult(Nil, None)
 
   def buildTargetCleanCache(params: CleanCacheParams): IO[CleanCacheResult] =
@@ -351,7 +348,7 @@ object Bsp4BazelServer:
         .groupMap(_._1)(_._2)
         .map { case (v, ks) =>
           // we know there is at least one K for each V
-          (v, NonEmptyList.fromListUnsafe(ks))  
+          (v, NonEmptyList.fromListUnsafe(ks))
         }
 
     private val sourceTargets
@@ -368,7 +365,7 @@ object Bsp4BazelServer:
     ): List[BuildTargetIdentifier] =
       sourceTargets.get(td) match {
         case Some(nel) => nel.toList
-        case None => Nil
+        case None      => Nil
       }
 
   object TargetSourceMap:
