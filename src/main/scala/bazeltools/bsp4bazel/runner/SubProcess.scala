@@ -56,9 +56,10 @@ case class SubProcess(
 
   private def mkEnvironment: IO[ProcessBuilder] =
     IO.blocking {
-      val pb = new ProcessBuilder(command)
+      val bz = workingDirectory.resolve(command).toAbsolutePath
+      val pb = new ProcessBuilder(bz.toString)
       pb.directory(workingDirectory.toFile)
-      pb.command((command :: args.toList): _*)
+      pb.command((bz.toString :: args.toList): _*)
 
       val pbEnv = pb.environment()
 
