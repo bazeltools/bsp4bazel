@@ -139,7 +139,6 @@ object BazelRunner:
 
   enum BazelWrapper(val command: String):
     case At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
-    case Default extends BazelWrapper("bazel")
 
   def default(
       workspaceRoot: Path,
@@ -152,7 +151,7 @@ object BazelRunner:
       workspaceRoot: Path,
       logger: Logger
   ): BazelRunner =
-    default(workspaceRoot, logger, BazelWrapper.Default)
+    default(workspaceRoot, logger, BazelWrapper.At(workspaceRoot.resolve("bazel")))
 
   private case class BazelRunnerImpl(
       workspaceRoot: Path,
