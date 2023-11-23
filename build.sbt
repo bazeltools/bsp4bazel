@@ -1,4 +1,4 @@
-val scala3Version = "3.2.2"
+val scala3Version = "3.3.1"
 
 enablePlugins(GraalVMNativeImagePlugin)
 enablePlugins(BuildInfoPlugin)
@@ -14,13 +14,13 @@ lazy val root = project
     organization := "bazeltools",
     version := bsp4BazelVersion,
     scalaVersion := scala3Version,
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "3.4.10",
-    libraryDependencies += "co.fs2" %% "fs2-core" % "3.6.1",
-    libraryDependencies += "co.fs2" %% "fs2-io" % "3.6.1",
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.5",
-    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.5",
-    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.5",
-    libraryDependencies += "org.typelevel" %% "cats-parse" % "0.3.9",
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "3.5.2",
+    libraryDependencies += "co.fs2" %% "fs2-core" % "3.9.2",
+    libraryDependencies += "co.fs2" %% "fs2-io" % "3.9.2",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.6",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.6",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.6",
+    libraryDependencies += "org.typelevel" %% "cats-parse" % "0.3.10",
     libraryDependencies += "com.monovore" %% "decline" % "2.4.1",
     libraryDependencies += "com.monovore" %% "decline-effect" % "2.4.1",
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,

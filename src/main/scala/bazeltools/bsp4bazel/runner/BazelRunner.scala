@@ -128,19 +128,17 @@ object BazelRunner:
       expected: BazelResult.ExitCode*
   ): IO[Unit] =
     if !expected.contains(BazelResult.ExitCode.fromCode(er.exitCode)) then
-      for
-        err <- er.debugString
-        _ <- IO.raiseError(BazelRunError(err, er.exitCode))
-      yield ()
+      er.debugString
+        .flatMap { err =>
+          IO.raiseError(BazelRunError(err, er.exitCode))
+        }
     else IO.unit
 
   case class BazelRunError(detailsMessage: String, exitCode: Int)
       extends Error(s"Bazel Run Failed: $exitCode\n$detailsMessage")
 
-  sealed trait BazelWrapper(val command: String)
-  object BazelWrapper:
-    case class At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
-    case object Default extends BazelWrapper("./bazel")
+  enum BazelWrapper(val command: String):
+    case At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
 
   def default(
       workspaceRoot: Path,
@@ -153,7 +151,7 @@ object BazelRunner:
       workspaceRoot: Path,
       logger: Logger
   ): BazelRunner =
-    default(workspaceRoot, logger, BazelWrapper.Default)
+    default(workspaceRoot, logger, BazelWrapper.At(workspaceRoot.resolve("bazel")))
 
   private case class BazelRunnerImpl(
       workspaceRoot: Path,
@@ -163,12 +161,12 @@ object BazelRunner:
 
     private def runBazel(
         command: Command,
-        expr: Option[String]
+        args: List[String]
     ): Resource[IO, ExecutionResult] =
       for
         _ <- Resource.eval(
           logger.info(
-            s"Running ${bazelWrapper.command} ${command.asString} ${expr.getOrElse("_no_args_")}"
+            s"Running ${bazelWrapper.command} ${command.asString} ${args.mkString(" ")}"
           )
         )
         er <- SubProcess
@@ -176,14 +174,14 @@ object BazelRunner:
             workspaceRoot,
             bazelWrapper.command
           )
-          .withArgs(command.asString :: expr.toList)
+          .withArgs(command.asString :: args)
           .runUntilExit(FiniteDuration(30, TimeUnit.MINUTES))
         _ <- Resource.eval(logger.info(s"Exited with ${er.exitCode}"))
       yield er
 
     private def runBazelExpectOk(
         command: Command,
-        expr: Option[String]
+        expr: List[String]
     ): Resource[IO, ExecutionResult] =
       for
         er <- runBazel(command, expr)
@@ -193,24 +191,24 @@ object BazelRunner:
       yield er
 
     def query(expr: String): IO[BazelResult] =
-      runBazel(Command.Query, Some(expr)).use(
+      runBazel(Command.Query, expr :: Nil).use(
         BazelResult.fromExecutionResult(_)
       )
 
     def build(label: BazelLabel): IO[BazelResult] =
-      runBazel(Command.Build, Some(label.asString))
+      runBazel(Command.Build, label.asString :: Nil)
         .use(BazelResult.fromExecutionResult(_))
 
     def run(label: BazelLabel): IO[BazelResult] =
-      runBazel(Command.Run, Some(label.asString))
+      runBazel(Command.Run, label.asString :: Nil)
         .use(BazelResult.fromExecutionResult(_))
 
     def test(label: BazelLabel): IO[BazelResult] =
-      runBazel(Command.Test, Some(label.asString))
+      runBazel(Command.Test, label.asString :: Nil)
         .use(BazelResult.fromExecutionResult(_))
 
     def shutdown: IO[Unit] =
-      runBazelExpectOk(Command.Shutdown, None).use_
+      runBazelExpectOk(Command.Shutdown, Nil).use_
 
     def clean: IO[Unit] =
-      runBazelExpectOk(Command.Clean, None).use_
+      runBazelExpectOk(Command.Clean, Nil).use_

@@ -7,6 +7,7 @@ import bazeltools.bsp4bazel.protocol.*
 import bazeltools.bsp4bazel.runner.BazelLabel
 import bazeltools.bsp4bazel.runner.BazelRunner
 import bazeltools.bsp4bazel.runner.BspBazelRunner
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.Queue
@@ -51,21 +52,17 @@ class Bsp4BazelServer(
           )
         )
       )
-      resp <- IO.pure {
-        val compileProvider = CompileProvider(List("scala"))
-
-        InitializeBuildResult(
-          "Bazel",
-          BuildInfo.version,
-          BuildInfo.bspVersion,
-          BuildServerCapabilities(
-            compileProvider = Some(compileProvider),
-            inverseSourcesProvider = Some(true),
-            canReload = Some(true)
-          )
-        )
-      }
-    yield resp
+      compileProvider = CompileProvider(List("scala"))
+    yield InitializeBuildResult(
+      "Bazel",
+      BuildInfo.version,
+      BuildInfo.bspVersion,
+      BuildServerCapabilities(
+        compileProvider = Some(compileProvider),
+        inverseSourcesProvider = Some(true),
+        canReload = Some(true)
+      )
+    )
 
   def buildInitialized(params: Unit): IO[Unit] =
     for
@@ -143,18 +140,14 @@ class Bsp4BazelServer(
   def buildTargetScalacOptions(
       params: ScalacOptionsParams
   ): IO[ScalacOptionsResult] =
-    for
-      _ <- logger.info("buildTarget/scalacOptions")
-      resp = ScalacOptionsResult(Nil)
-    yield resp
+    for _ <- logger.info("buildTarget/scalacOptions")
+    yield ScalacOptionsResult(Nil)
 
   def buildTargetJavacOptions(
       params: JavacOptionsParams
   ): IO[JavacOptionsResult] =
-    for
-      _ <- logger.info("buildTarget/javacOptions")
-      resp = JavacOptionsResult(Nil)
-    yield resp
+    for _ <- logger.info("buildTarget/javacOptions")
+    yield JavacOptionsResult(Nil)
 
   private def doCompile(
       workspaceRoot: Path,
@@ -260,8 +253,7 @@ class Bsp4BazelServer(
     yield ()
 
   def buildShutdown(params: Unit): IO[Unit] =
-    for _ <- logger.info("build/shutdown")
-    yield ()
+    logger.info("build/shutdown")
 
   def buildExit(params: Unit): IO[Unit] =
     for
@@ -280,7 +272,7 @@ class Bsp4BazelServer(
           case Right(bazelTarget) =>
             bazelRunner
               .targetSources(bazelTarget)
-              .map(ss => (bt, ss.map(s => TextDocumentIdentifier.file(s))))
+              .map(ss => (bt, ss.map(TextDocumentIdentifier.file)))
           case Left(err) =>
             IO.raiseError(err)
       }
@@ -307,26 +299,21 @@ class Bsp4BazelServer(
   def buildTargetDependencySources(
       params: DependencySourcesParams
   ): IO[DependencySourcesResult] =
-    for
-      _ <- logger.info("buildTarget/dependencySources")
-      resp = DependencySourcesResult(Nil)
-    yield resp
+    for _ <- logger.info("buildTarget/dependencySources")
+    yield DependencySourcesResult(Nil)
 
   def buildTargetScalaMainClasses(
       params: ScalaMainClassesParams
   ): IO[ScalaMainClassesResult] =
-    for
-      _ <- logger.info("buildTarget/scalaMainClasses")
-      resp = ScalaMainClassesResult(Nil, None)
-    yield resp
+    for _ <- logger.info("buildTarget/scalaMainClasses")
+    yield ScalaMainClassesResult(Nil, None)
 
   def buildTargetCleanCache(params: CleanCacheParams): IO[CleanCacheResult] =
     for _ <- logger.info("buildTarget/cleanCache")
     yield CleanCacheResult(Some("Cleaned"), true)
 
   def cancelRequest(params: CancelParams): IO[Unit] =
-    for _ <- logger.info("$/cancelRequest")
-    yield ()
+    logger.info("$/cancelRequest")
 
 end Bsp4BazelServer
 
@@ -355,13 +342,17 @@ object Bsp4BazelServer:
       ]]
   ):
 
-    private def invertMap[K, V](map: Map[K, List[V]]): Map[V, List[K]] =
+    private def invertMap[K, V](map: Map[K, List[V]]): Map[V, NonEmptyList[K]] =
       map.toList
         .flatMap((bt, ls) => ls.map(l => (l, bt)))
         .groupMap(_._1)(_._2)
+        .map { case (v, ks) =>
+          // we know there is at least one K for each V
+          (v, NonEmptyList.fromListUnsafe(ks))
+        }
 
     private val sourceTargets
-        : Map[TextDocumentIdentifier, List[BuildTargetIdentifier]] =
+        : Map[TextDocumentIdentifier, NonEmptyList[BuildTargetIdentifier]] =
       invertMap(_targetSources)
 
     def sourcesForTarget(
@@ -372,7 +363,10 @@ object Bsp4BazelServer:
     def targetsForSource(
         td: TextDocumentIdentifier
     ): List[BuildTargetIdentifier] =
-      sourceTargets.get(td).getOrElse(Nil)
+      sourceTargets.get(td) match {
+        case Some(nel) => nel.toList
+        case None      => Nil
+      }
 
   object TargetSourceMap:
     def empty: TargetSourceMap = TargetSourceMap(Map.empty)
