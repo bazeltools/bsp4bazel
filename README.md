@@ -35,22 +35,11 @@ load("@bsp4bazel-rules//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
 bsp4bazel_setup()
 ```
 
-And finally add at least one bsp target (although you can add as many as you like) to specify a project to build. To add a bsp target place a `bsp_target` rule in the `BUILD` files, as so:
-
-```starlark
-load("@bsp4bazel-rules//:bsp_target.bzl", "bsp_target")
-
-bsp_target(
-    name = "--> a unique name for the bsp target",
-    target = "--> the bazel target to trigger",
-)
-```
-
 # TODO
 
 - [x] Compile provider
 - [x] Make Bazel setup more straight forward
-- [ ] Generate SemanticDB files ([related](https://github.com/bazelbuild/rules_scala/pull/1467))
+- [x] Generate SemanticDB files ([related](https://github.com/bazelbuild/rules_scala/pull/1467))
 - [ ] Test provider
 - [ ] Run provider
 - [ ] Debug provider
