@@ -97,7 +97,7 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
         )
         assertEquals(bti.targetLabel, BazelLabel.fromStringUnsafe("@//src/example/foo:foo"))
         assert(bti.semanticdbTargetRoot.endsWith("_semanticdb/foo"))
-        assert(bti.semanticdbPluginjar.endsWith("semanticdb-scalac_2.12.18-4.8.4.jar"))
+        assert(bti.semanticdbPluginjar.head.endsWith("semanticdb-scalac_2.12.18-4.8.4-stamped.jar"))
     }
 
 //   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))

@@ -100,7 +100,7 @@ object BspTaskRunner:
             scalaVersion = info.scalaVersion,
             scalaBinaryVersion = majorVersion(info.scalaVersion),
             platform = ScalaPlatform.JVM,
-            jars = info.scalaCompileJars.map(UriFactory.fileUri),
+            jars = info.scalaCompileJars.map(p => UriFactory.fileUri(workspaceRoot.resolve(p))),
             jvmBuildTarget = None
           ).asJson
         )
@@ -110,8 +110,8 @@ object BspTaskRunner:
       ScalacOptionsItem(
         target = id,
         options = info.scalacOptions,
-        classpath = info.classpath.map(UriFactory.fileUri),
-        classDirectory = UriFactory.fileUri(info.semanticdbTargetRoot)
+        classpath = info.classpath.map(p => UriFactory.fileUri(workspaceRoot.resolve(p))),
+        classDirectory = UriFactory.fileUri(workspaceRoot.resolve(info.semanticdbTargetRoot))
       )
 
   case class BspTargetInfo(
@@ -122,7 +122,7 @@ object BspTaskRunner:
       srcs: List[Path],
       targetLabel: BazelLabel,
       semanticdbTargetRoot: Path,
-      semanticdbPluginjar: Path
+      semanticdbPluginjar: List[Path]
   )
 
   object BspTargetInfo:
@@ -182,7 +182,7 @@ case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
           "--aspects",
           "@bsp4bazel-rules//private:bsp_target_info_aspect.bzl%bsp_target_info_aspect"
         ),
-        ("--output_groups", "json_output_file")
+        ("--output_groups", "bsp_output")
       )
       _ <- raiseIfNotOk(result)
       filePath = workspaceRoot
