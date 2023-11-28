@@ -18,6 +18,7 @@ import io.circe.syntax._
 import java.net.URI
 import java.nio.file.Path
 import java.nio.file.Paths
+import bazeltools.bsp4bazel.protocol.BuildTargetIdentifier.bazel
 
 object UriFactory:
   def fileUri(path: Path): URI =
@@ -39,8 +40,11 @@ object BuildTargetIdentifier:
   given Codec[BuildTargetIdentifier] =
     deriveCodec[BuildTargetIdentifier]
 
-  def bazel(uri: String): BuildTargetIdentifier =
-    BuildTargetIdentifier(UriFactory.bazelUri(uri))
+  def bazel(label: BazelLabel): BuildTargetIdentifier =
+    BuildTargetIdentifier(UriFactory.bazelUri(label.asString))
+
+  // def bazel(label: String): BuildTargetIdentifier =
+  //   BuildTargetIdentifier(UriFactory.bazelUri(label))
 
   def file(uri: String): BuildTargetIdentifier =
     BuildTargetIdentifier(UriFactory.fileUri(uri))
@@ -379,7 +383,10 @@ case class PublishDiagnosticsParams(
     originId: Option[String],
     diagnostics: List[Diagnostic],
     reset: Boolean
-)
+):
+  def clearDiagnostics: PublishDiagnosticsParams =
+    this.copy(diagnostics = Nil, reset = true)
+
 object PublishDiagnosticsParams:
   given Codec[PublishDiagnosticsParams] =
     deriveCodec[PublishDiagnosticsParams]
@@ -420,7 +427,11 @@ object PublishDiagnosticsParams:
         )
       }
 
-case class TextDocumentIdentifier(uri: URI)
+case class TextDocumentIdentifier(uri: URI):
+  def relativize(root: Path): TextDocumentIdentifier =
+    val path = Paths.get(uri)
+    val relativePath = root.relativize(path)
+    TextDocumentIdentifier(UriFactory.fileUri(relativePath))
 
 object TextDocumentIdentifier:
   given Codec[TextDocumentIdentifier] =

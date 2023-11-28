@@ -18,7 +18,7 @@ trait BspServer(client: BspClient):
   def buildTargetJavacOptions(
       params: JavacOptionsParams
   ): IO[JavacOptionsResult]
-  def buildTargetSource(params: SourcesParams): IO[SourcesResult]
+  def buildTargetSources(params: SourcesParams): IO[SourcesResult]
   def buildTargetDependencySources(
       params: DependencySourcesParams
   ): IO[DependencySourcesResult]
@@ -46,7 +46,7 @@ object BspServer:
     case "buildTarget/javacOptions" =>
       RpcFunction(bspServer.buildTargetJavacOptions)
     case "buildTarget/sources" =>
-      RpcFunction(bspServer.buildTargetSource)
+      RpcFunction(bspServer.buildTargetSources)
     case "buildTarget/dependencySources" =>
       RpcFunction(bspServer.buildTargetDependencySources)
     case "buildTarget/scalaMainClasses" =>
@@ -60,5 +60,3 @@ object BspServer:
     case "$/cancelRequest" =>
       RpcFunction(bspServer.cancelRequest)
   }
-
-  case class Target(id: URI, name: String)

@@ -7,7 +7,7 @@ import cats.syntax.all.*
 import fs2.io.file.Files
 import fs2.io.file.Path
 import bazeltools.bsp4bazel.runner.BazelRunner
-import bazeltools.bsp4bazel.runner.BspBazelRunner
+import bazeltools.bsp4bazel.runner.BspTaskRunner
 import cats.data.EitherT
 
 import bazeltools.bsp4bazel.Logger
@@ -16,8 +16,8 @@ object Verifier:
 
   lazy val Cwd = Path("")
 
-  lazy val runner: BspBazelRunner =
-    BspBazelRunner.default(
+  lazy val runner: BspTaskRunner =
+    BspTaskRunner.default(
       Cwd.toNioPath.toAbsolutePath,
       Logger.noOp
     )
