@@ -41,7 +41,7 @@ class BazelRunnerTest extends munit.CatsEffectSuite:
         workspaceRoot,
         Logger.noOp
       )
-      (br.shutdown >> br.clean).unsafeRunSync()
+      // (br.shutdown >> br.clean).unsafeRunSync()
       (workspaceRoot, br)
     },
     teardown = { (_, br) => br.shutdown }
@@ -76,7 +76,6 @@ class BazelRunnerTest extends munit.CatsEffectSuite:
         List(
           "//src/example:example",
           "//src/example/foo:foo",
-          "//src/example/foo:foo_bsp"
         )
       )
     }

@@ -37,10 +37,11 @@ import scala.util.Try
   * rules)
   */
 trait BazelRunner:
-  def query(target: String): IO[BazelResult]
-  def build(target: BazelLabel): IO[BazelResult]
-  def run(target: BazelLabel): IO[BazelResult]
-  def test(target: BazelLabel): IO[BazelResult]
+  def query(expr: String, options: (String, String)*): IO[BazelResult]
+  def build(label: BazelLabel, options: (String, String)*): IO[BazelResult]
+  def run(label: BazelLabel, options: (String, String)*): IO[BazelResult]
+  def test(label: BazelLabel, options: (String, String)*): IO[BazelResult]
+
   def clean: IO[Unit]
   def shutdown: IO[Unit]
 
@@ -139,7 +140,6 @@ object BazelRunner:
 
   enum BazelWrapper(val command: String):
     case At(path: Path) extends BazelWrapper(path.toAbsolutePath.toString)
-    case Default extends BazelWrapper("bazel")
 
   def default(
       workspaceRoot: Path,
@@ -152,13 +152,22 @@ object BazelRunner:
       workspaceRoot: Path,
       logger: Logger
   ): BazelRunner =
-    default(workspaceRoot, logger, BazelWrapper.Default)
+    default(workspaceRoot, logger, BazelWrapper.At(workspaceRoot.resolve("bazel")))
 
   private case class BazelRunnerImpl(
       workspaceRoot: Path,
       logger: Logger,
       bazelWrapper: BazelWrapper
   ) extends BazelRunner:
+
+    private def runBazel(
+        command: Command,
+        options: List[(String, String)],
+        labelOrExpr: String 
+    ): Resource[IO, ExecutionResult] = {
+      val opts = options.map { case (k, v) => s"$k=$v" }
+      runBazel(command, (opts :+ labelOrExpr))
+    }
 
     private def runBazel(
         command: Command,
@@ -182,30 +191,30 @@ object BazelRunner:
 
     private def runBazelExpectOk(
         command: Command,
-        expr: List[String]
+        args: List[String]
     ): Resource[IO, ExecutionResult] =
       for
-        er <- runBazel(command, expr)
+        er <- runBazel(command, args)
         _ <- Resource.eval(
           BazelRunner.raiseIfUnxpectedExit(er, BazelResult.ExitCode.Ok)
         )
       yield er
 
-    def query(expr: String): IO[BazelResult] =
-      runBazel(Command.Query, expr :: Nil).use(
+    def query(expr: String, options: (String, String)*): IO[BazelResult] =
+      runBazel(Command.Query, options.toList, expr).use(
         BazelResult.fromExecutionResult(_)
       )
 
-    def build(label: BazelLabel): IO[BazelResult] =
-      runBazel(Command.Build, label.asString :: Nil)
+    def build(label: BazelLabel, options: (String, String)*): IO[BazelResult] =
+      runBazel(Command.Build, options.toList, label.asString)
         .use(BazelResult.fromExecutionResult(_))
 
-    def run(label: BazelLabel): IO[BazelResult] =
-      runBazel(Command.Run, label.asString :: Nil)
+    def run(label: BazelLabel, options: (String, String)*): IO[BazelResult] =
+      runBazel(Command.Run, options.toList, label.asString)
         .use(BazelResult.fromExecutionResult(_))
 
-    def test(label: BazelLabel): IO[BazelResult] =
-      runBazel(Command.Test, label.asString :: Nil)
+    def test(label: BazelLabel, options: (String, String)*): IO[BazelResult] =
+      runBazel(Command.Test, options.toList, label.asString)
         .use(BazelResult.fromExecutionResult(_))
 
     def shutdown: IO[Unit] =

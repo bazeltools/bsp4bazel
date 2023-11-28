@@ -121,6 +121,11 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
         Some("@myRepo"),
         "foo" :: "bar" :: BPath.BNil,
         Some(BazelTarget.AllTargetsAndRules)
+      ),
+      BazelLabel.fromString("@//foo").toTry.get -> BazelLabel(
+        Some("@"),
+        "foo" :: BPath.BNil,
+        None 
       )
     )
 
@@ -158,7 +163,7 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
     )
   }
 
-  property("should round-trip paths") {
+  property("should round-trip labels") {
     forAll(BazelLabelTest.genBazelLabel) { bl1 =>
       val str = bl1.asString
       val bl2 = BazelLabel.fromString(str).toTry.get
@@ -166,7 +171,7 @@ class BazelLabelTest extends munit.CatsEffectSuite with munit.ScalaCheckSuite:
     }
   }
 
-  property("should round-trip paths as JSON") {
+  property("should round-trip labels as JSON") {
     forAll(BazelLabelTest.genBazelLabel) { bl1 =>
       val json = bl1.asJson
       val bl2 = json.as[BazelLabel].toTry.get
@@ -179,7 +184,7 @@ end BazelLabelTest
 object BazelLabelTest:
 
   private val genRepo: Gen[String] =
-    Gen.alphaStr.map(s => s"@myRepo$s")
+    Gen.alphaStr.map(s => s"@$s")
 
   private def genPath: Gen[BPath] =
     for

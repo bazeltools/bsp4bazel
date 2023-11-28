@@ -6,7 +6,7 @@ import bazeltools.bsp4bazel.jrpc.Notification
 import bazeltools.bsp4bazel.protocol.*
 import bazeltools.bsp4bazel.runner.BazelLabel
 import bazeltools.bsp4bazel.runner.BazelRunner
-import bazeltools.bsp4bazel.runner.BspBazelRunner
+import bazeltools.bsp4bazel.runner.BspTaskRunner
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.kernel.Ref
@@ -33,7 +33,8 @@ class Bsp4BazelServer(
     logger: Logger,
     stateRef: Ref[IO, Bsp4BazelServer.ServerState],
     val exitSignal: Deferred[IO, Either[Throwable, Unit]]
-) extends BspServer(client):
+) extends BspServer(client)
+    with Bsp4BazelServer.Helpers:
 
   def buildInitialize(
       params: InitializeBuildParams
@@ -44,8 +45,8 @@ class Bsp4BazelServer(
       _ <- stateRef.update(state =>
         state.copy(
           workspaceRoot = Some(workspaceRoot),
-          bspBazelRunner = Some(
-            BspBazelRunner.default(
+          bspTaskRunner = Some(
+            BspTaskRunner.default(
               workspaceRoot,
               logger
             )
@@ -68,19 +69,23 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("build/initialized")
       state <- stateRef.get
-      root <- state.workspaceRoot.asIO
-      ws <- workspaceBuildTargets(())
-      ts <- state.bspBazelRunner.mapToIO { runner =>
-        doBuildTargetSources(
-          root,
-          runner,
-          ws.targets.map(_.id)
-        )
-      }
+      workspaceRoot <- state.workspaceRoot.asIO
+      runner <- state.bspTaskRunner.asIO
+      targets <- buildTargets(logger, workspaceRoot, runner)
       _ <- stateRef.update(s =>
-        s.copy(targetSourceMap = Bsp4BazelServer.TargetSourceMap(ts))
+        s.copy(
+          targets = Some(targets),
+          targetSourceMap = Bsp4BazelServer.TargetSourceMap(targets)
+        )
       )
     yield ()
+
+  def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult] =
+    for
+      _ <- logger.info("workspace/buildTargets")
+      state <- stateRef.get
+      targets <- state.targets.asIO
+    yield WorkspaceBuildTargetsResult(targets.map(_.asBuildTarget))
 
   def buildTargetInverseSources(
       params: InverseSourcesParams
@@ -88,60 +93,41 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("buildTarget/inverseSources")
       state <- stateRef.get
-      root <- state.workspaceRoot.asIO
-    yield
-      val relativeUri =
-        UriFactory.fileUri(
-          root.relativize(Paths.get(params.textDocument.uri))
-        )
-
-      InverseSourcesResult(
-        state.targetSourceMap.targetsForSource(
-          TextDocumentIdentifier(relativeUri)
-        )
+      workspaceRoot <- state.workspaceRoot.asIO
+    yield InverseSourcesResult(
+      state.targetSourceMap.targetsForSource(
+        params.textDocument.relativize(workspaceRoot)
       )
-
-  private def buildTarget(
-      bspTarget: BspServer.Target,
-      workspaceRoot: Path
-  ): BuildTarget =
-    BuildTarget(
-      BuildTargetIdentifier(bspTarget.id),
-      Some(bspTarget.name),
-      Some(UriFactory.fileUri(workspaceRoot)),
-      List("library"),
-      BuildTargetCapabilities(true, false, false, false),
-      List("scala"),
-      Nil,
-      Some("scala"),
-      Some(
-        ScalaBuildTarget(
-          "org.scala-lang",
-          "2.12",
-          "2.12",
-          ScalaPlatform.JVM,
-          Nil,
-          None
-        ).asJson
-      )
-    )
-
-  def workspaceBuildTargets(params: Unit): IO[WorkspaceBuildTargetsResult] =
-    for
-      _ <- logger.info("workspace/buildTargets")
-      state <- stateRef.get
-      runner <- state.bspBazelRunner.asIO
-      root <- state.workspaceRoot.asIO
-      bspTargets <- runner.bspTargets
-    yield WorkspaceBuildTargetsResult(
-      bspTargets.map(t => buildTarget(t, root))
     )
 
   def buildTargetScalacOptions(
       params: ScalacOptionsParams
   ): IO[ScalacOptionsResult] =
-    for _ <- logger.info("buildTarget/scalacOptions")
-    yield ScalacOptionsResult(Nil)
+    for
+      _ <- logger.info("buildTarget/scalacOptions")
+      state <- stateRef.get
+      bspTargets <- state.targets.asIO
+    yield
+      val select = params.targets.toSet
+      val filtered = bspTargets.filter(bi => select(bi.id))
+      require(
+        filtered.size == params.targets.size,
+        "Some of the requested targets didn't exist. Shouldn't be possible"
+      )
+      ScalacOptionsResult(filtered.map(_.asScalaOptionItem))
+
+  private def buildTargetScalacOption(
+      target: BuildTargetIdentifier
+  ): IO[ScalacOptionsItem] =
+    for
+      state <- stateRef.get
+      bspTargets <- state.targets.asIO
+    yield ScalacOptionsItem(
+      target = target,
+      options = Nil,
+      classpath = Nil,
+      classDirectory = UriFactory.fileUri(Paths.get(".bsp/semanticdb"))
+    )
 
   def buildTargetJavacOptions(
       params: JavacOptionsParams
@@ -149,71 +135,15 @@ class Bsp4BazelServer(
     for _ <- logger.info("buildTarget/javacOptions")
     yield JavacOptionsResult(Nil)
 
-  private def doCompile(
-      workspaceRoot: Path,
-      bazelRunner: BspBazelRunner,
-      target: BuildTargetIdentifier,
-      id: TaskId
-  ): IO[List[FileDiagnostics]] =
-    BazelLabel.fromBuildTargetIdentifier(target) match {
-      case Right(bazelLabel) =>
-        bazelRunner
-          .compile(bazelLabel)
-          .filterNot(fd => fd.path.toString.endsWith("<no file>"))
-          .evalTap { fd =>
-            for
-              time <- IO.realTimeInstant
-              _ <- client.buildTaskProgress(
-                TaskProgressParams(
-                  id,
-                  Some(time.toEpochMilli),
-                  Some("Compile In Progress"),
-                  Some(50),
-                  Some("files"),
-                  None,
-                  None
-                )
-              )
-            yield ()
-          }
-          .evalTap { fd =>
-            PublishDiagnosticsParams
-              .fromScalacDiagnostic(
-                workspaceRoot,
-                target,
-                fd
-              )
-              .mapToIO(client.publishDiagnostics(_))
-          }
-          .compile
-          .toList
-      case Left(err) => IO.raiseError(err)
-    }
+  def buildTargetCompile(params: CompileParams): IO[Unit] =
+    params.targets.traverse_(buildSingleTarget)
 
-  // If we don't get back any FileDiagnostics, we assume there's now no errors, so have to
-  // clear these out by publishing an empty Diagnostic for them
-  private def clearPrevDiagnostics(
-      target: BuildTargetIdentifier,
-      fds: List[FileDiagnostics]
-  ): IO[Unit] =
+  def buildSingleTarget(target: BuildTargetIdentifier): IO[Unit] =
     for
+      _ <- logger.info(s"Compiling target: ${target.uri.getPath}")
       state <- stateRef.get
-      root <- state.workspaceRoot.asIO
-      pathSet = fds.map(fs => fs.path).toSet
-      clearDiagnostics <- state.currentErrors
-        .filterNot(fd => pathSet.contains(fd.path))
-        .map(_.clearDiagnostics)
-        .traverse { fd =>
-          PublishDiagnosticsParams
-            .fromScalacDiagnostic(root, target, fd)
-            .asIO
-        }
-      _ <- clearDiagnostics.traverse_(client.publishDiagnostics)
-      _ <- stateRef.update(_.copy(currentErrors = fds))
-    yield ()
-
-  private def compileTarget(target: BuildTargetIdentifier): IO[Unit] =
-    for
+      workspaceRoot <- state.workspaceRoot.asIO
+      runner <- state.bspTaskRunner.asIO
       id <- IO.randomUUID.map(u => TaskId(u.toString, None))
       start <- IO.realTimeInstant
       _ <- client.buildTaskStart(
@@ -225,12 +155,15 @@ class Bsp4BazelServer(
           Some(CompileTask(target).asJson)
         )
       )
-      state <- stateRef.get
-      runner <- state.bspBazelRunner.asIO
-      fds <- state.workspaceRoot.mapToIO { root =>
-        doCompile(root, runner, target, id)
-      }
-      _ <- clearPrevDiagnostics(target, fds)
+      newErrors <- compile(workspaceRoot, runner, target, id)
+      clearDiagnostics = mkClearDiagnostics(
+        target,
+        workspaceRoot,
+        newErrors,
+        state.currentErrors
+      )
+      _ <- clearDiagnostics.traverse_(client.publishDiagnostics)
+      _ <- stateRef.update(s => s.copy(currentErrors = newErrors))
       end <- IO.realTimeInstant
       _ <- client.buildTaskFinished(
         TaskFinishParams(
@@ -244,45 +177,11 @@ class Bsp4BazelServer(
       )
     yield ()
 
-  def buildTargetCompile(params: CompileParams): IO[Unit] =
-    for
-      _ <- logger.info(
-        s"Compiling targets: ${params.targets.map(_.uri.toString).mkString(",")}"
-      )
-      _ <- params.targets.traverse_(compileTarget)
-    yield ()
-
-  def buildShutdown(params: Unit): IO[Unit] =
-    logger.info("build/shutdown")
-
-  def buildExit(params: Unit): IO[Unit] =
-    for
-      _ <- logger.info("build/exit")
-      _ <- exitSignal.complete(Right(()))
-    yield ()
-
-  private def doBuildTargetSources(
-      workspaceRoot: Path,
-      bazelRunner: BspBazelRunner,
-      targets: List[BuildTargetIdentifier]
-  ): IO[Map[BuildTargetIdentifier, List[TextDocumentIdentifier]]] =
-    targets
-      .traverse { bt =>
-        BazelLabel.fromBuildTargetIdentifier(bt) match
-          case Right(bazelTarget) =>
-            bazelRunner
-              .targetSources(bazelTarget)
-              .map(ss => (bt, ss.map(TextDocumentIdentifier.file)))
-          case Left(err) =>
-            IO.raiseError(err)
-      }
-      .map(_.toMap)
-
-  def buildTargetSource(params: SourcesParams): IO[SourcesResult] =
+  def buildTargetSources(params: SourcesParams): IO[SourcesResult] =
     for
       _ <- logger.info("buildTarget/sources")
       state <- stateRef.get
-      root <- state.workspaceRoot.asIO
+      workspaceRoot <- state.workspaceRoot.asIO
     yield
       val sourcesItem = params.targets.map { target =>
         val sources = state.targetSourceMap
@@ -291,7 +190,8 @@ class Bsp4BazelServer(
         SourcesItem(
           target,
           sources,
-          Some(List(UriFactory.fileUri(root).toString))
+          None
+          // Some(List(UriFactory.fileUri(workspaceRoot).toString))
         )
       }
       SourcesResult(sourcesItem)
@@ -315,20 +215,106 @@ class Bsp4BazelServer(
   def cancelRequest(params: CancelParams): IO[Unit] =
     logger.info("$/cancelRequest")
 
+  def buildShutdown(params: Unit): IO[Unit] =
+    logger.info("build/shutdown")
+
+  def buildExit(params: Unit): IO[Unit] =
+    for
+      _ <- logger.info("build/exit")
+      _ <- exitSignal.complete(Right(()))
+    yield ()
+
 end Bsp4BazelServer
 
 object Bsp4BazelServer:
 
-  case class ServerState(
+  protected trait Helpers:
+    this: Bsp4BazelServer =>
+
+    def buildTargets(
+        logger: Logger,
+        workspaceRoot: Path,
+        runner: BspTaskRunner
+    ): IO[List[BspTaskRunner.BspTarget]] =
+      for
+        ids <- runner.bspTargets
+        targets <- ids.traverse(id =>
+          buildTarget(logger, runner, workspaceRoot, id)
+        )
+      yield targets
+
+    def buildTarget(
+        logger: Logger,
+        runner: BspTaskRunner,
+        workspaceRoot: Path,
+        target: BuildTargetIdentifier
+    ): IO[BspTaskRunner.BspTarget] =
+      for
+        _ <- logger.info(s"Fetching build target $target")
+        bti <- runner.bspTarget(target)
+      yield BspTaskRunner.BspTarget(
+        target,
+        workspaceRoot,
+        bti
+      )
+
+    // If we don't get back any FileDiagnostics, we assume there's now no errors, so have to
+    // clear these out by publishing an empty Diagnostic for them
+    def mkClearDiagnostics(
+        target: BuildTargetIdentifier,
+        workspaceRoot: Path,
+        newErrors: List[PublishDiagnosticsParams],
+        currentErrors: List[PublishDiagnosticsParams]
+    ): List[PublishDiagnosticsParams] =
+      val select = newErrors.map(_.textDocument).toSet
+      currentErrors
+        // Filter out any errors that are still present
+        .filterNot(pd => select(pd.textDocument))
+        // Create an empty diagnostic for the ones left
+        .map(_.clearDiagnostics)
+
+    def compile(
+        workspaceRoot: Path,
+        bazelRunner: BspTaskRunner,
+        target: BuildTargetIdentifier,
+        id: TaskId
+    ): IO[List[PublishDiagnosticsParams]] =
+      BazelLabel.fromBuildTargetIdentifier(target) match {
+        case Right(bazelLabel) =>
+          bazelRunner
+            .compile(bazelLabel)
+            .filterNot(fd => fd.path.toString.endsWith("<no file>"))
+            .map { fd =>
+              PublishDiagnosticsParams
+                .fromScalacDiagnostic(
+                  workspaceRoot,
+                  target,
+                  fd
+                )
+                .getOrElse(
+                  throw new Exception(
+                    s"Couldn't convert diagnostic into something publishable. Got $fd"
+                  )
+                )
+            }
+            .compile
+            .toList
+
+        case Left(err) => IO.raiseError(err)
+      }
+
+  end Helpers
+
+  protected case class ServerState(
       targetSourceMap: Bsp4BazelServer.TargetSourceMap,
-      currentErrors: List[FileDiagnostics],
+      currentErrors: List[PublishDiagnosticsParams],
       workspaceRoot: Option[Path],
-      bspBazelRunner: Option[BspBazelRunner],
-      targets: List[BuildTarget]
+      bspTaskRunner: Option[BspTaskRunner],
+      targets: Option[List[BspTaskRunner.BspTarget]]
   )
 
   def defaultState: ServerState =
-    ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, Nil)
+    ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, None)
 
   def create(client: BspClient, logger: Logger): IO[Bsp4BazelServer] =
     for
@@ -369,4 +355,13 @@ object Bsp4BazelServer:
       }
 
   object TargetSourceMap:
+    def apply(targets: List[BspTaskRunner.BspTarget]): TargetSourceMap =
+      TargetSourceMap(
+        targets
+          .map(t =>
+            (t.id, t.info.srcs.map(path => TextDocumentIdentifier.file(path)))
+          )
+          .toMap
+      )
+
     def empty: TargetSourceMap = TargetSourceMap(Map.empty)

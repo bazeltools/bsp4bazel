@@ -2,8 +2,9 @@ load("@io_bazel_rules_scala//scala:scala_toolchain.bzl", "scala_toolchain")
 
 scala_toolchain(
     name = "my_toolchain_impl",
-    enable_diagnostics_report = True,
     enable_semanticdb = True,
+    semanticdb_bundle_in_jar = False,
+    enable_diagnostics_report = True,
     visibility = ["//visibility:public"],
 )
 

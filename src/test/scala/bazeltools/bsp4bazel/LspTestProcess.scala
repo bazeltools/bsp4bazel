@@ -40,6 +40,7 @@ import bazeltools.bsp4bazel.protocol.WorkspaceBuildTargetsResult
 import bazeltools.bsp4bazel.Bsp4BazelApp
 import bazeltools.bsp4bazel.IOLifts
 import bazeltools.bsp4bazel.Logger
+import bazeltools.bsp4bazel.runner.BazelLabel
 type OpenRequests = Map[String, Deferred[IO, Response]]
 
 /** A cient interface to the BSP server.
@@ -320,7 +321,8 @@ case class Lsp(actions: Vector[Lsp.Action]):
     this :+ Lsp.Action.Start
 
   def compile(target: String): Lsp =
-    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(target))
+    val label = BazelLabel.fromString(target).toOption.get
+    this :+ Lsp.Action.Compile(BuildTargetIdentifier.bazel(label))
 
   def workspaceTargets: Lsp =
     this :+ Lsp.Action.WorkspaceTargets

@@ -175,6 +175,9 @@ object BazelLabel:
       )
     )
 
+  def fromStringUnsafe(str: String): BazelLabel =
+    fromString(str).fold(throw _, identity)
+
   def fromBuildTargetIdentifier(
       bid: BuildTargetIdentifier
   ): Either[Throwable, BazelLabel] =
@@ -185,7 +188,7 @@ object BazelLabel:
 
   private[runner] val parser: P0[BazelLabel] =
     val repo: P[String] =
-      (P.char('@') ~ P.charsWhile(c => c != '/')).string
+      (P.char('@') ~ P.charsWhile(c => c != '/').?).string
 
     ((repo.? <* P.string("//")) ~
       BPath.parser ~ (P.char(':') *> BazelTarget.parser).?)
