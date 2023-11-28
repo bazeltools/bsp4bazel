@@ -76,7 +76,6 @@ class BazelRunnerTest extends munit.CatsEffectSuite:
         List(
           "//src/example:example",
           "//src/example/foo:foo",
-          "//src/example/foo:foo_bsp"
         )
       )
     }

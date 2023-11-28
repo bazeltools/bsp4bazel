@@ -180,7 +180,7 @@ case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
         bazelLabel,
         (
           "--aspects",
-          "@bsp4bazel-rules//private:bsp_target_info_aspect.bzl%bsp_target_info_aspect"
+          "@bsp4bazel-rules//:bsp_target_info_aspect.bzl%bsp_target_info_aspect"
         ),
         ("--output_groups", "bsp_output")
       )
