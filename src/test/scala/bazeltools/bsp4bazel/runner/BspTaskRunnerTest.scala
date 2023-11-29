@@ -70,7 +70,7 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
           .bspTarget(strToTarget("//src/example/foo:foo"))
           .unsafeRunSync()
 
-        assertEquals(bti.scalaVersion, "2.12.18")
+        assertEquals(bti.scalaVersion, "2.13.12")
         assertEquals(bti.scalacOptions, Nil)
         assertEquals(
           bti.classpath.map(_.getFileName.toString).sorted,
@@ -92,12 +92,19 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
           bti.srcs.map(_.toString).sorted,
           List(
             "src/example/foo/Bar.scala",
-            "src/example/foo/Foo.scala",
+            "src/example/foo/Foo.scala"
           )
         )
-        assertEquals(bti.targetLabel, BazelLabel.fromStringUnsafe("@//src/example/foo:foo"))
+        assertEquals(
+          bti.targetLabel,
+          BazelLabel.fromStringUnsafe("@//src/example/foo:foo")
+        )
         assert(bti.semanticdbTargetRoot.endsWith("_semanticdb/foo"))
-        assert(bti.semanticdbPluginjar.head.endsWith("semanticdb-scalac_2.12.18-4.8.4-stamped.jar"))
+        assert(
+          bti.semanticdbPluginjar.head.endsWith(
+            "semanticdb-scalac_2.12.18-4.8.4-stamped.jar"
+          )
+        )
     }
 
 //   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
