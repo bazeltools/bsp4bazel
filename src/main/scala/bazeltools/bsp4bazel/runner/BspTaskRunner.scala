@@ -100,7 +100,9 @@ object BspTaskRunner:
             scalaVersion = info.scalaVersion,
             scalaBinaryVersion = majorVersion(info.scalaVersion),
             platform = ScalaPlatform.JVM,
-            jars = info.scalaCompileJars.map(p => UriFactory.fileUri(workspaceRoot.resolve(p))),
+            jars = info.scalaCompileJars.map(p =>
+              UriFactory.fileUri(workspaceRoot.resolve(p))
+            ),
             jvmBuildTarget = None
           ).asJson
         )
@@ -109,9 +111,16 @@ object BspTaskRunner:
     def asScalaOptionItem: ScalacOptionsItem =
       ScalacOptionsItem(
         target = id,
-        options = info.scalacOptions,
-        classpath = info.classpath.map(p => UriFactory.fileUri(workspaceRoot.resolve(p))),
-        classDirectory = UriFactory.fileUri(workspaceRoot.resolve(info.semanticdbTargetRoot))
+        // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as 
+        // semanticdb is instead configured in the Bazel rules.
+        options = List(
+          s"-Xplugin:${info.semanticdbPluginjar}",
+          s"-P:semanticdb:sourceroot:${workspaceRoot}"
+        ) ::: info.scalacOptions,
+        classpath =
+          info.classpath.map(p => UriFactory.fileUri(workspaceRoot.resolve(p))),
+        classDirectory =
+          UriFactory.fileUri(workspaceRoot.resolve(info.semanticdbTargetRoot))
       )
 
   case class BspTargetInfo(
