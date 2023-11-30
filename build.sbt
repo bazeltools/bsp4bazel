@@ -4,7 +4,7 @@ enablePlugins(GraalVMNativeImagePlugin)
 enablePlugins(BuildInfoPlugin)
 
 // <--- Updated automatically by release job
-val bsp4BazelVersion = "0.0.29"
+val bsp4BazelVersion = "0.0.30"
 // --->
 
 lazy val root = project
