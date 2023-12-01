@@ -29,6 +29,7 @@ import bazeltools.bsp4bazel.Logger
 import bazeltools.bsp4bazel.runner.BPath.BNil
 import bazeltools.bsp4bazel.protocol.BspServer
 
+import cats.data.NonEmptyList
 import java.net.URI
 import bazeltools.bsp4bazel.runner.BazelResult.ExitCode
 
@@ -39,13 +40,16 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
 
   val projectRoot = Paths.get("").toAbsolutePath
 
+  val packageRoots = NonEmptyList.one(BazelLabel.fromStringUnsafe("//..."))
+
   def strToTarget(str: String): BuildTargetIdentifier =
     BuildTargetIdentifier.bazel(BazelLabel.fromString(str).toOption.get)
 
-  def bazelEnv(workspaceRoot: Path) = FunFixture[(Path, BspTaskRunner)](
+  def bazelEnv(workspaceRoot: Path, packageRoots: NonEmptyList[BazelLabel]) = FunFixture[(Path, BspTaskRunner)](
     setup = { test =>
       val bbr = BspTaskRunner.default(
         workspaceRoot,
+        packageRoots,
         Logger.noOp
       )
       (workspaceRoot, bbr)
@@ -53,7 +57,7 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
     teardown = { (_, bbr) => bbr.runner.shutdown }
   )
 
-  bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
+  bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
     .test("should list all project tagets") { (root, runner) =>
       runner.bspTargets.assertEquals(
         List(
@@ -63,7 +67,7 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
       )
     }
 
-  bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
+  bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
     .test("should return the correct metadata for a given target") {
       (root, runner) =>
         val bti = runner

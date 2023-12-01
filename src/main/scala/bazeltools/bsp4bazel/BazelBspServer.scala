@@ -12,7 +12,6 @@ import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.Queue
 import cats.syntax.all._
-import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Json
@@ -32,6 +31,7 @@ class Bsp4BazelServer(
     client: BspClient,
     logger: Logger,
     stateRef: Ref[IO, Bsp4BazelServer.ServerState],
+    packageRoots: NonEmptyList[BazelLabel],
     val exitSignal: Deferred[IO, Either[Throwable, Unit]]
 ) extends BspServer(client)
     with Bsp4BazelServer.Helpers:
@@ -48,6 +48,7 @@ class Bsp4BazelServer(
           bspTaskRunner = Some(
             BspTaskRunner.default(
               workspaceRoot,
+              packageRoots,
               logger
             )
           )
@@ -316,11 +317,11 @@ object Bsp4BazelServer:
   def defaultState: ServerState =
     ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, None)
 
-  def create(client: BspClient, logger: Logger): IO[Bsp4BazelServer] =
+  def create(client: BspClient, logger: Logger, packageRoots: NonEmptyList[BazelLabel]): IO[Bsp4BazelServer] =
     for
       exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
       stateRef <- Ref.of[IO, Bsp4BazelServer.ServerState](defaultState)
-    yield Bsp4BazelServer(client, logger, stateRef, exitSwitch)
+    yield Bsp4BazelServer(client, logger, stateRef, packageRoots, exitSwitch)
 
   protected case class TargetSourceMap(
       val _targetSources: Map[BuildTargetIdentifier, List[

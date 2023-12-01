@@ -21,6 +21,7 @@ import io.bazel.rules_scala.diagnostics.diagnostics.TargetDiagnostics
 import io.circe.Decoder
 import io.circe.generic.semiauto.*
 import io.circe.syntax._
+import cats.data.NonEmptyList
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.FileSystems
@@ -45,11 +46,13 @@ object BspTaskRunner:
 
   def default(
       workspaceRoot: Path,
+      packageRoots: NonEmptyList[BazelLabel],
       logger: Logger,
       wrapper: BazelRunner.BazelWrapper
   ): BspTaskRunner =
     BspTaskRunner(
       workspaceRoot,
+      packageRoots,
       BazelRunner.default(
         workspaceRoot,
         logger,
@@ -59,10 +62,12 @@ object BspTaskRunner:
 
   def default(
       workspaceRoot: Path,
+      packageRoots: NonEmptyList[BazelLabel],
       logger: Logger
   ): BspTaskRunner =
     BspTaskRunner(
       workspaceRoot,
+      packageRoots,
       BazelRunner.default(
         workspaceRoot,
         logger
@@ -111,7 +116,7 @@ object BspTaskRunner:
     def asScalaOptionItem: ScalacOptionsItem =
       ScalacOptionsItem(
         target = id,
-        // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as 
+        // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as
         // semanticdb is instead configured in the Bazel rules.
         options = List(
           s"-Xplugin:${info.semanticdbPluginjar}",
@@ -151,7 +156,11 @@ object BspTaskRunner:
         "semanticdb_pluginjar"
       )(BspTargetInfo.apply)
 
-case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
+case class BspTaskRunner(
+    workspaceRoot: Path,
+    packageRoots: NonEmptyList[BazelLabel],
+    runner: BazelRunner
+):
 
   private val SupportedRules = Array(
     "scala_library",
@@ -168,10 +177,10 @@ case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
           )
         )
 
-  def bspTargets: IO[List[BuildTargetIdentifier]] =
+  def bspTargets2(packageRoot: BazelLabel): IO[List[BuildTargetIdentifier]] =
     for
       result <- runner.query(
-        s"kind(\"${SupportedRules.mkString("|")}\", //...)"
+        s"kind(\"${SupportedRules.mkString("|")}\", ${packageRoot.asString})"
       )
       _ <- raiseIfNotOk(result)
     yield result.stdout
@@ -179,6 +188,9 @@ case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
       .collect { case Right(label) =>
         BuildTargetIdentifier.bazel(label)
       }
+
+  def bspTargets: IO[List[BuildTargetIdentifier]] =
+    packageRoots.toList.flatTraverse(bspTargets2)
 
   def bspTarget(
       target: BuildTargetIdentifier
