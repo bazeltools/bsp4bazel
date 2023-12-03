@@ -105,8 +105,7 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         .runIn(root)
         .unsafeRunSync()
 
-      println(("NOTIFICTATIONS", notifications))
-      // assertEquals(notifications.length, 6)
+      assertEquals(notifications.length, 4)
 
       assertEquals(
         notifications
@@ -122,23 +121,23 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         StatusCode.Ok
       )
 
-      // notifications.selectDiagnostics("Foo.scala").foreach {
-      //   case MiniDiagnostic(Range(start, end), _, "not found: type BeforeT") =>
-      //     assertEquals(start, Position(5, 32))
-      //     assertEquals(end, Position(6, 0))
+      notifications.selectDiagnostics("Foo.scala").foreach {
+        case MiniDiagnostic(Range(start, end), _, "not found: type BeforeT") =>
+          assertEquals(start, Position(5, 32))
+          assertEquals(end, Position(6, 0))
 
-      //   case MiniDiagnostic(Range(start, end), _, "not found: type IntZ") =>
-      //     assertEquals(start, Position(5, 18))
-      //     assertEquals(end, Position(5, 22))
+        case MiniDiagnostic(Range(start, end), _, "not found: type IntZ") =>
+          assertEquals(start, Position(5, 18))
+          assertEquals(end, Position(5, 22))
 
-      //   case d => fail(s"Wasn't expecting diagnostic $d")
-      // }
+        case d => fail(s"Wasn't expecting diagnostic $d")
+      }
 
-      // notifications.selectDiagnostics("Bar.scala").foreach {
-      //   case MiniDiagnostic(Range(start, end), _, "not found: type StringQ") =>
-      //     assertEquals(start, Position(3, 18))
-      //     assertEquals(end, Position(3, 25))
+      notifications.selectDiagnostics("Bar.scala").foreach {
+        case MiniDiagnostic(Range(start, end), _, "not found: type StringQ") =>
+          assertEquals(start, Position(3, 18))
+          assertEquals(end, Position(3, 25))
 
-      //   case d => fail(s"Wasn't expecting diagnostic $d")
-      // }
+        case d => fail(s"Wasn't expecting diagnostic $d")
+      }
     }

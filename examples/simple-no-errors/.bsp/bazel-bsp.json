@@ -8,6 +8,9 @@
     ],
     "argv": [
         "../../target/universal/stage/bin/bsp4bazel",
+        "server",
+        "--package",
+        "//...",
         "--verbose"
     ]
 }

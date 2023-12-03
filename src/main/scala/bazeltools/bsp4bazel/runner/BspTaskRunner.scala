@@ -53,6 +53,7 @@ object BspTaskRunner:
     BspTaskRunner(
       workspaceRoot,
       packageRoots,
+      logger,
       BazelRunner.default(
         workspaceRoot,
         logger,
@@ -68,6 +69,7 @@ object BspTaskRunner:
     BspTaskRunner(
       workspaceRoot,
       packageRoots,
+      logger,
       BazelRunner.default(
         workspaceRoot,
         logger
@@ -159,6 +161,7 @@ object BspTaskRunner:
 case class BspTaskRunner(
     workspaceRoot: Path,
     packageRoots: NonEmptyList[BazelLabel],
+    logger: Logger,
     runner: BazelRunner
 ):
 
@@ -177,52 +180,48 @@ case class BspTaskRunner(
           )
         )
 
-  def bspTargets2(packageRoot: BazelLabel): IO[List[BuildTargetIdentifier]] =
+  private def buildTargets(
+      packageRoot: BazelLabel
+  ): IO[List[BuildTargetIdentifier]] =
     for
-      result <- runner.query(
-        s"kind(\"${SupportedRules.mkString("|")}\", ${packageRoot.asString})"
-      )
-      _ <- raiseIfNotOk(result)
-    yield result.stdout
-      .map(BazelLabel.fromString)
-      .collect { case Right(label) =>
-        BuildTargetIdentifier.bazel(label)
-      }
-
-  def bspTargets: IO[List[BuildTargetIdentifier]] =
-    packageRoots.toList.flatTraverse(bspTargets2)
-
-  def bspTarget(
-      target: BuildTargetIdentifier
-  ): IO[BspTaskRunner.BspTargetInfo] =
-    val bazelLabel = BazelLabel.fromBuildTargetIdentifier(target).toOption.get
-    for
-      result <- runner.build(
-        bazelLabel,
+      buildResult <- runner.build(
+        packageRoot,
         (
           "--aspects",
           "@bsp4bazel-rules//:bsp_target_info_aspect.bzl%bsp_target_info_aspect"
         ),
         ("--output_groups", "bsp_output")
       )
-      _ <- raiseIfNotOk(result)
-      filePath = workspaceRoot
-        .resolve("bazel-bin")
-        .resolve(bazelLabel.packagePath.asPath)
-        .resolve(s"${bazelLabel.target.get.asString}_bsp_target_info.json")
-      info <- FilesIO.readJson[BspTaskRunner.BspTargetInfo](filePath)
-    yield info
+      _ <- raiseIfNotOk(buildResult)
+      queryResult <- runner.query(
+        s"kind(\"${SupportedRules.mkString("|")}\", ${packageRoot.asString})"
+      )
+      _ <- raiseIfNotOk(queryResult)
+    yield queryResult.stdout
+      .map(BazelLabel.fromString)
+      .collect { case Right(label) =>
+        BuildTargetIdentifier.bazel(label)
+      }
 
-  // private def readSourceFile(target: BazelLabel): IO[List[String]] =
-  //   val filePath = workspaceRoot
-  //     .resolve("bazel-bin")
-  //     .resolve(target.packagePath.asPath)
-  //     .resolve("sources.json")
-  //   FilesIO.readJson[BazelSources](filePath).map(_.sources)
+  def buildTargets: IO[List[BuildTargetIdentifier]] =
+    packageRoots.toList.flatTraverse(buildTargets)
 
-  // def targetSources(target: BazelLabel): IO[List[String]] =
-  //   runner.build(target) *>
-  //     readSourceFile(target)
+  def bspTargets(
+      targets: List[BuildTargetIdentifier]
+  ): IO[List[BspTaskRunner.BspTarget]] =
+    targets.parTraverse(bspTarget)
+
+  def bspTarget(
+      target: BuildTargetIdentifier
+  ): IO[BspTaskRunner.BspTarget] =
+    val bazelLabel = BazelLabel.fromBuildTargetIdentifier(target).toOption.get
+    val filePath = workspaceRoot
+      .resolve("bazel-bin")
+      .resolve(bazelLabel.packagePath.asPath)
+      .resolve(s"${bazelLabel.target.get.asString}_bsp_target_info.json")
+
+    for info <- FilesIO.readJson[BspTaskRunner.BspTargetInfo](filePath)
+    yield BspTaskRunner.BspTarget(target, workspaceRoot, info)
 
   private def diagnostics: Stream[IO, FileDiagnostics] =
     FilesIO

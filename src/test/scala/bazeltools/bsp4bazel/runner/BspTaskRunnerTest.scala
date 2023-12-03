@@ -59,7 +59,7 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
 
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
     .test("should list all project tagets") { (root, runner) =>
-      runner.bspTargets.assertEquals(
+      runner.buildTargets.assertEquals(
         List(
           "//src/example:example",
           "//src/example/foo:foo"
@@ -70,14 +70,14 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
     .test("should return the correct metadata for a given target") {
       (root, runner) =>
-        val bti = runner
+        val bt = runner
           .bspTarget(strToTarget("//src/example/foo:foo"))
           .unsafeRunSync()
 
-        assertEquals(bti.scalaVersion, "2.12.18")
-        assertEquals(bti.scalacOptions, Nil)
+        assertEquals(bt.info.scalaVersion, "2.12.18")
+        assertEquals(bt.info.scalacOptions, Nil)
         assertEquals(
-          bti.classpath.map(_.getFileName.toString).sorted,
+          bt.info.classpath.map(_.getFileName.toString).sorted,
           List(
             "foo-ijar.jar",
             "scala-library-2.12.18-stamped.jar",
@@ -85,7 +85,7 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
           )
         )
         assertEquals(
-          bti.scalaCompileJars.map(_.getFileName.toString).sorted,
+          bt.info.scalaCompileJars.map(_.getFileName.toString).sorted,
           List(
             "scala-compiler-2.12.18-stamped.jar",
             "scala-library-2.12.18-stamped.jar",
@@ -93,64 +93,14 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
           )
         )
         assertEquals(
-          bti.srcs.map(_.toString).sorted,
+          bt.info.srcs.map(_.toString).sorted,
           List(
             "src/example/foo/Bar.scala",
             "src/example/foo/Foo.scala",
           )
         )
-        assertEquals(bti.targetLabel, BazelLabel.fromStringUnsafe("@//src/example/foo:foo"))
-        assert(bti.semanticdbTargetRoot.endsWith("_semanticdb/foo"))
-        assert(bti.semanticdbPluginjar.head.endsWith("semanticdb-scalac_2.12.18-4.8.4-stamped.jar"))
+        assertEquals(bt.info.targetLabel, BazelLabel.fromStringUnsafe("@//src/example/foo:foo"))
+        assert(bt.info.semanticdbTargetRoot.endsWith("_semanticdb/foo"))
+        assert(bt.info.semanticdbPluginjar.head.endsWith("semanticdb-scalac_2.12.18-4.8.4-stamped.jar"))
     }
 
-//   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
-//     .test("should call query in Bazel") { (root, runner) =>
-
-//       val result = runner
-//         .query("//src/example/...")
-//         .unsafeRunSync()
-
-//       assertEquals(result.exitCode, BazelResult.ExitCode.Ok)
-//       assertEquals(
-//         result.stdout,
-//         List(
-//           "//src/example:example",
-//           "//src/example/foo:foo",
-//           "//src/example/foo:foo_bsp"
-//         )
-//       )
-//     }
-
-//   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
-//     .test("should call test Bazel") { (root, runner) =>
-
-//       val result = runner
-//         .test(
-//           BazelLabel(
-//             None,
-//             "src" :: "test" :: BNil,
-//             Some(BazelTarget.Single("all_tests"))
-//           )
-//         )
-//         .unsafeRunSync()
-
-//       assertEquals(result.exitCode, BazelResult.ExitCode.Ok)
-//       assert(result.stdout.mkString("").contains("PASSED"))
-//     }
-
-//   bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
-//     .test("should call run Bazel") { (root, runner) =>
-//       val result = runner
-//         .run(
-//           BazelLabel(
-//             None,
-//             "src" :: BNil,
-//             Some(BazelTarget.Single("main_run"))
-//           )
-//         )
-//         .unsafeRunSync()
-
-//       assertEquals(result.exitCode, BazelResult.ExitCode.Ok)
-//       assert(result.stdout.mkString("").contains("Hello World"))
-//     }
