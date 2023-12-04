@@ -1,4 +1,3 @@
-//> using file "project.test.scala"
 
 class WorkflowTest extends munit.FunSuite:
 

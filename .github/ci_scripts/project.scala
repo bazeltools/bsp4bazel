@@ -1,5 +1,6 @@
-//> using scala "3.2"
-//> using lib "com.lihaoyi::os-lib:0.9.0"
+//> using scala "3.3"
+//> using dep "com.lihaoyi::os-lib:0.9.2"
+//> using test.dep "org.scalameta::munit::0.7.29"
 
 import scala.util.matching.Regex
 import scala.math.Ordering
