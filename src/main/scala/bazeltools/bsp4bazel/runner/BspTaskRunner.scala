@@ -123,7 +123,7 @@ object BspTaskRunner:
             scalaBinaryVersion = workspaceInfo.majorScalaVersion,
             platform = ScalaPlatform.JVM,
             jars = workspaceInfo.scalacDeps.map(p =>
-              UriFactory.fileUri(workspaceRoot.resolve("bazel-out").resolve(p))
+              UriFactory.fileUri(workspaceRoot.resolve(p))
             ),
             jvmBuildTarget = None
           ).asJson
@@ -136,7 +136,7 @@ object BspTaskRunner:
         // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as
         // semanticdb is instead configured in the Bazel rules.
         options = List(
-          s"-Xplugin:${workspaceRoot.resolve("bazel-out").resolve(workspaceInfo.semanticdbDep)}",
+          s"-Xplugin:${workspaceRoot.resolve(workspaceInfo.semanticdbDep)}",
           s"-P:semanticdb:sourceroot:${workspaceRoot}"
         ) ::: info.scalacOptions,
         classpath =
