@@ -31,10 +31,10 @@ class BazelRulesTest extends munit.FunSuite:
       assert(os.exists(dir / "bazel-bin" / "bsp_workspace_deps.json"))
     
       val json = os.read(dir / "bazel-bin" / "bsp_workspace_deps.json")
-      assert(json.contains("semanticdb-scalac"))
-      assert(json.contains("scala-reflect"))
-      assert(json.contains("scala-library"))
-      assert(json.contains("scala-compilerz"))
+      assert(json.contains("semanticdb-scalac"), "No semanticdb dep")
+      assert(json.contains("scala-reflect"), "No scala-reflect dep")
+      assert(json.contains("scala-library"), "No scala-library dep")
+      assert(json.contains("scala-compiler"), "No scala-compiler dep")
     }
   }
 
