@@ -12,7 +12,6 @@ import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.Queue
 import cats.syntax.all._
-import io.bazel.rules_scala.diagnostics.diagnostics.FileDiagnostics
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Json
@@ -32,6 +31,7 @@ class Bsp4BazelServer(
     client: BspClient,
     logger: Logger,
     stateRef: Ref[IO, Bsp4BazelServer.ServerState],
+    packageRoots: NonEmptyList[BazelLabel],
     val exitSignal: Deferred[IO, Either[Throwable, Unit]]
 ) extends BspServer(client)
     with Bsp4BazelServer.Helpers:
@@ -48,6 +48,7 @@ class Bsp4BazelServer(
           bspTaskRunner = Some(
             BspTaskRunner.default(
               workspaceRoot,
+              packageRoots,
               logger
             )
           )
@@ -155,7 +156,8 @@ class Bsp4BazelServer(
           Some(CompileTask(target).asJson)
         )
       )
-      newErrors <- compile(workspaceRoot, runner, target, id)
+      newErrors <- compile(workspaceRoot, runner, target, id, logger)
+      _ <- newErrors.traverse_(client.publishDiagnostics) 
       clearDiagnostics = mkClearDiagnostics(
         target,
         workspaceRoot,
@@ -237,26 +239,10 @@ object Bsp4BazelServer:
         runner: BspTaskRunner
     ): IO[List[BspTaskRunner.BspTarget]] =
       for
-        ids <- runner.bspTargets
-        targets <- ids.traverse(id =>
-          buildTarget(logger, runner, workspaceRoot, id)
-        )
-      yield targets
-
-    def buildTarget(
-        logger: Logger,
-        runner: BspTaskRunner,
-        workspaceRoot: Path,
-        target: BuildTargetIdentifier
-    ): IO[BspTaskRunner.BspTarget] =
-      for
-        _ <- logger.info(s"Fetching build target $target")
-        bti <- runner.bspTarget(target)
-      yield BspTaskRunner.BspTarget(
-        target,
-        workspaceRoot,
-        bti
-      )
+        _ <- logger.info(s"Fetching build targets")
+        ids <- runner.buildTargets
+        infos <- runner.bspTargets(ids)
+      yield infos
 
     // If we don't get back any FileDiagnostics, we assume there's now no errors, so have to
     // clear these out by publishing an empty Diagnostic for them
@@ -277,13 +263,15 @@ object Bsp4BazelServer:
         workspaceRoot: Path,
         bazelRunner: BspTaskRunner,
         target: BuildTargetIdentifier,
-        id: TaskId
+        id: TaskId,
+        logger: Logger
     ): IO[List[PublishDiagnosticsParams]] =
       BazelLabel.fromBuildTargetIdentifier(target) match {
         case Right(bazelLabel) =>
           bazelRunner
             .compile(bazelLabel)
             .filterNot(fd => fd.path.toString.endsWith("<no file>"))
+            .evalTap(fd => logger.info(s"Got diagnostic: $fd"))
             .map { fd =>
               PublishDiagnosticsParams
                 .fromScalacDiagnostic(
@@ -316,11 +304,15 @@ object Bsp4BazelServer:
   def defaultState: ServerState =
     ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, None)
 
-  def create(client: BspClient, logger: Logger): IO[Bsp4BazelServer] =
+  def create(
+      client: BspClient,
+      logger: Logger,
+      packageRoots: NonEmptyList[BazelLabel]
+  ): IO[Bsp4BazelServer] =
     for
       exitSwitch <- Deferred[IO, Either[Throwable, Unit]]
       stateRef <- Ref.of[IO, Bsp4BazelServer.ServerState](defaultState)
-    yield Bsp4BazelServer(client, logger, stateRef, exitSwitch)
+    yield Bsp4BazelServer(client, logger, stateRef, packageRoots, exitSwitch)
 
   protected case class TargetSourceMap(
       val _targetSources: Map[BuildTargetIdentifier, List[

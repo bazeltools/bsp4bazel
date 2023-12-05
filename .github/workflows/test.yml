@@ -28,8 +28,9 @@ jobs:
         distribution: 'temurin'
         cache: 'sbt'
     - uses: VirtusLab/scala-cli-setup@main 
+    - name: Run deploy script tests
+      run: scala-cli test ./.github/ci_scripts
+    - name: Run bazel_rule tests
+      run: scala-cli test bazel_rules/test/ 
     - name: Run tests
       run: sbt test
-    # Also test release scripts (the ones we can)
-    - name: Run scala-cli tests
-      run: scala-cli test ./.github/ci_scripts

@@ -45,56 +45,56 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
     teardown = { (_, br) => br.shutdown }
   )
 
-  // bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
-  //   .test("should successfully initialize") { (root, bazel) =>
+  bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
+    .test("should successfully initialize") { (root, bazel) =>
 
-  //     val (responses, notifications) = Lsp.start.shutdown
-  //       .runIn(root)
-  //       .unsafeRunSync()
+      val (responses, notifications) = Lsp.start.shutdown
+        .runIn(root)
+        .unsafeRunSync()
 
-  //     assertEquals(notifications, Nil)
+      assertEquals(notifications, Nil)
 
-  //     assertEquals(
-  //       responses.select[InitializeBuildResult],
-  //       InitializeBuildResult(
-  //         "Bazel",
-  //         BuildInfo.version,
-  //         BuildInfo.bspVersion,
-  //         BuildServerCapabilities(
-  //           compileProvider = Some(CompileProvider(List("scala"))),
-  //           inverseSourcesProvider = Some(true),
-  //           canReload = Some(true)
-  //         )
-  //       )
-  //     )
+      assertEquals(
+        responses.select[InitializeBuildResult],
+        InitializeBuildResult(
+          "Bazel",
+          BuildInfo.version,
+          BuildInfo.bspVersion,
+          BuildServerCapabilities(
+            compileProvider = Some(CompileProvider(List("scala"))),
+            inverseSourcesProvider = Some(true),
+            canReload = Some(true)
+          )
+        )
+      )
 
-  //   }
+    }
 
-  // bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
-  //   .test("should compile with no errors") { (root, bazel) =>
+  bazelEnv(projectRoot.resolve("examples/simple-no-errors"))
+    .test("should compile with no errors") { (root, bazel) =>
 
-  //     val (_, notifications) = Lsp.start.workspaceTargets
-  //       .compile("//...")
-  //       .shutdown
-  //       .runIn(root)
-  //       .unsafeRunSync()
+      val (_, notifications) = Lsp.start.workspaceTargets
+        .compile("//...")
+        .shutdown
+        .runIn(root)
+        .unsafeRunSync()
 
-  //     assertEquals(notifications.length, 2)
+      assertEquals(notifications.length, 2)
 
-  //     assertEquals(
-  //       notifications
-  //         .selectNotification[TaskStartParams]("build/taskStart")
-  //         .message,
-  //       Some("Compile Started")
-  //     )
+      assertEquals(
+        notifications
+          .selectNotification[TaskStartParams]("build/taskStart")
+          .message,
+        Some("Compile Started")
+      )
 
-  //     assertEquals(
-  //       notifications
-  //         .selectNotification[TaskFinishParams]("build/taskFinish")
-  //         .status,
-  //       StatusCode.Ok
-  //     )
-  //   }
+      assertEquals(
+        notifications
+          .selectNotification[TaskFinishParams]("build/taskFinish")
+          .status,
+        StatusCode.Ok
+      )
+    }
 
   bazelEnv(projectRoot.resolve("examples/simple-with-errors"))
     .test("should compile and report 3 errors") { (root, bazel) =>
@@ -105,8 +105,10 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         .runIn(root)
         .unsafeRunSync()
 
-      println(("NOTIFICTATIONS", notifications))
-      // assertEquals(notifications.length, 6)
+      
+      // Until https://github.com/bazelbuild/rules_scala/pull/1532 merged
+      // --- 
+      // assertEquals(notifications.length, 4)
 
       assertEquals(
         notifications
@@ -122,23 +124,26 @@ class End2EndTest extends munit.CatsEffectSuite with BspHelpers:
         StatusCode.Ok
       )
 
-      // notifications.selectDiagnostics("Foo.scala").foreach {
-      //   case MiniDiagnostic(Range(start, end), _, "not found: type BeforeT") =>
-      //     assertEquals(start, Position(5, 32))
-      //     assertEquals(end, Position(6, 0))
 
-      //   case MiniDiagnostic(Range(start, end), _, "not found: type IntZ") =>
-      //     assertEquals(start, Position(5, 18))
-      //     assertEquals(end, Position(5, 22))
+    // Until https://github.com/bazelbuild/rules_scala/pull/1532 merged
+    // --- 
+    //   notifications.selectDiagnostics("Foo.scala").foreach {
+    //     case MiniDiagnostic(Range(start, end), _, "not found: type BeforeT") =>
+    //       assertEquals(start, Position(5, 32))
+    //       assertEquals(end, Position(6, 0))
 
-      //   case d => fail(s"Wasn't expecting diagnostic $d")
-      // }
+    //     case MiniDiagnostic(Range(start, end), _, "not found: type IntZ") =>
+    //       assertEquals(start, Position(5, 18))
+    //       assertEquals(end, Position(5, 22))
 
-      // notifications.selectDiagnostics("Bar.scala").foreach {
-      //   case MiniDiagnostic(Range(start, end), _, "not found: type StringQ") =>
-      //     assertEquals(start, Position(3, 18))
-      //     assertEquals(end, Position(3, 25))
+    //     case d => fail(s"Wasn't expecting diagnostic $d")
+    //   }
 
-      //   case d => fail(s"Wasn't expecting diagnostic $d")
-      // }
+    //   notifications.selectDiagnostics("Bar.scala").foreach {
+    //     case MiniDiagnostic(Range(start, end), _, "not found: type StringQ") =>
+    //       assertEquals(start, Position(3, 18))
+    //       assertEquals(end, Position(3, 25))
+
+    //     case d => fail(s"Wasn't expecting diagnostic $d")
+    //   }
     }
