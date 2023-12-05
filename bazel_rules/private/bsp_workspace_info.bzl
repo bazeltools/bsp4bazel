@@ -1,4 +1,5 @@
 load("@io_bazel_rules_scala//scala/private/toolchain_deps:toolchain_deps.bzl", "find_deps_info_on")
+load("@io_bazel_rules_scala_config//:config.bzl", "SCALA_VERSION")
 
 def _copy_files(ctx, files):
     output_files = []
@@ -16,9 +17,9 @@ def _copy_files(ctx, files):
 
     return output_files
 
-def _bsp_workspace_deps_impl(ctx):
+def _bsp_workspace_info_impl(ctx):
     """
-    This function copies the dependencies for the BSP workspace into a known output location.
+    Outputs metadata about the BSP workspace, as well as copying depenendies to output (so that downstream tools can use them)
 
     Args:
         ctx: The context object.
@@ -47,14 +48,15 @@ def _bsp_workspace_deps_impl(ctx):
 
     json_output_file = ctx.actions.declare_file(ctx.attr.name + ".json")
     output_struct = struct(
-        scalac = [file.path for file in scalac_output_files],
-        semanticdb = [file.path for file in semanticdb_output_files],
+        scala_version = SCALA_VERSION,
+        scalac_deps = [file.path for file in scalac_output_files],
+        semanticdb_dep = [file.path for file in semanticdb_output_files][0],
     )
     ctx.actions.write(json_output_file, json.encode_indent(output_struct))
 
     return [DefaultInfo(files = depset(scalac_output_files + semanticdb_output_files + [json_output_file]))]
 
-bsp_workspace_deps = rule(
-    implementation = _bsp_workspace_deps_impl,
+bsp_workspace_info = rule(
+    implementation = _bsp_workspace_info_impl,
     toolchains = ["@io_bazel_rules_scala//scala:toolchain_type"],
 )

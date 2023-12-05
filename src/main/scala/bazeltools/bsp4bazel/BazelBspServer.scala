@@ -72,11 +72,13 @@ class Bsp4BazelServer(
       state <- stateRef.get
       workspaceRoot <- state.workspaceRoot.asIO
       runner <- state.bspTaskRunner.asIO
+      workspaceInfo <- runner.workspaceInfo
       targets <- buildTargets(logger, workspaceRoot, runner)
       _ <- stateRef.update(s =>
         s.copy(
           targets = Some(targets),
-          targetSourceMap = Bsp4BazelServer.TargetSourceMap(targets)
+          targetSourceMap = Bsp4BazelServer.TargetSourceMap(targets),
+          workspaceInfo = Some(workspaceInfo)
         )
       )
     yield ()
@@ -85,8 +87,9 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("workspace/buildTargets")
       state <- stateRef.get
-      targets <- state.targets.asIO
-    yield WorkspaceBuildTargetsResult(targets.map(_.asBuildTarget))
+      workspaceInfo <- state.workspaceInfo.asIO
+      bspTargets <- state.targets.asIO
+    yield WorkspaceBuildTargetsResult(bspTargets.map(_.asBuildTarget(workspaceInfo)))
 
   def buildTargetInverseSources(
       params: InverseSourcesParams
@@ -107,6 +110,7 @@ class Bsp4BazelServer(
     for
       _ <- logger.info("buildTarget/scalacOptions")
       state <- stateRef.get
+      workspaceInfo <- state.workspaceInfo.asIO
       bspTargets <- state.targets.asIO
     yield
       val select = params.targets.toSet
@@ -115,7 +119,7 @@ class Bsp4BazelServer(
         filtered.size == params.targets.size,
         "Some of the requested targets didn't exist. Shouldn't be possible"
       )
-      ScalacOptionsResult(filtered.map(_.asScalaOptionItem))
+      ScalacOptionsResult(filtered.map(_.asScalaOptionItem(workspaceInfo)))
 
   private def buildTargetScalacOption(
       target: BuildTargetIdentifier
@@ -298,11 +302,12 @@ object Bsp4BazelServer:
       currentErrors: List[PublishDiagnosticsParams],
       workspaceRoot: Option[Path],
       bspTaskRunner: Option[BspTaskRunner],
-      targets: Option[List[BspTaskRunner.BspTarget]]
+      targets: Option[List[BspTaskRunner.BspTarget]],
+      workspaceInfo: Option[BspTaskRunner.WorkspaceInfo]
   )
 
   def defaultState: ServerState =
-    ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, None)
+    ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, None, None)
 
   def create(
       client: BspClient,

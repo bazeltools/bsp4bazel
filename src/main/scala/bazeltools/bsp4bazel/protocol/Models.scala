@@ -629,3 +629,12 @@ case class CompileReport(
 )
 object CompileReport:
   given Codec[CompileReport] = deriveCodec[CompileReport]
+
+
+object CommonCodecs:
+  given pathCodec: Codec[Path] = Codec.from(
+    Decoder[String].emap { s =>
+      Either.catchNonFatal(Paths.get(s)).leftMap(_.getMessage)
+    },
+    Encoder[String].contramap(_.toString)
+  )

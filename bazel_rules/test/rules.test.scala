@@ -21,16 +21,17 @@ class BazelRulesTest extends munit.FunSuite:
       assert(os.exists(dir / "bazel-bin" / "src" / "example" / "foo" / "foo_bsp_target_info.json"))
     }
   
-    test(s"should output bsp_workspace_deps.json for $dir") {
+    test(s"should output bsp_workspace_info.json for $dir") {
       os.proc(
         dir / "bazel",
         "build",
-        "//:bsp_workspace_deps",
+        "//:bsp_workspace_info",
       ).call(cwd = dir)
     
-      assert(os.exists(dir / "bazel-bin" / "bsp_workspace_deps.json"))
+      assert(os.exists(dir / "bazel-bin" / "bsp_workspace_info.json"))
     
-      val json = os.read(dir / "bazel-bin" / "bsp_workspace_deps.json")
+      val json = os.read(dir / "bazel-bin" / "bsp_workspace_info.json")
+      assert(json.contains("2.12.18"), "No scala version")
       assert(json.contains("semanticdb-scalac"), "No semanticdb dep")
       assert(json.contains("scala-reflect"), "No scala-reflect dep")
       assert(json.contains("scala-library"), "No scala-library dep")

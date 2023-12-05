@@ -76,21 +76,37 @@ object BspTaskRunner:
       )
     )
 
+  case class WorkspaceInfo(
+      scalaVersion: String,
+      scalacDeps: List[Path],
+      semanticdbDep: Path
+  ):
+    def majorScalaVersion: String =
+      val SemVer = """(\d+)\.(\d+)\.(\d+).*""".r
+      scalaVersion match
+        case SemVer("2", minor, patch) =>
+          List("2", minor).mkString(".")
+        case SemVer("3", _, _) =>
+          "3"
+
+  object WorkspaceInfo:
+
+    import bazeltools.bsp4bazel.protocol.CommonCodecs.pathCodec
+
+    given workspaceInfoDecoder: Decoder[WorkspaceInfo] =
+      Decoder.forProduct3(
+        "scala_version",
+        "scalac_deps",
+        "semanticdb_dep"
+      )(WorkspaceInfo.apply)
+
   case class BspTarget(
       id: BuildTargetIdentifier,
       workspaceRoot: Path,
       info: BspTargetInfo
   ):
 
-    private def majorVersion(version: String): String =
-      val SemVer = """(\d+)\.(\d+)\.(\d+).*""".r
-      version match
-        case SemVer("2", minor, patch) =>
-          List("2", minor).mkString(".")
-        case SemVer("3", _, _) =>
-          "3"
-
-    def asBuildTarget: BuildTarget =
+    def asBuildTarget(workspaceInfo: WorkspaceInfo): BuildTarget =
       BuildTarget(
         id = id,
         displayName = Some(id.uri.getPath),
@@ -98,30 +114,29 @@ object BspTaskRunner:
         tags = List("library"),
         capabilities = BuildTargetCapabilities(true, false, false, false),
         languageIds = List("scala"),
-        // TODO
         dependencies = Nil,
         dataKind = Some("scala"),
         Some(
           ScalaBuildTarget(
             scalaOrganization = "org.scala-lang",
-            scalaVersion = info.scalaVersion,
-            scalaBinaryVersion = majorVersion(info.scalaVersion),
+            scalaVersion = workspaceInfo.scalaVersion,
+            scalaBinaryVersion = workspaceInfo.majorScalaVersion,
             platform = ScalaPlatform.JVM,
-            jars = info.scalaCompileJars.map(p =>
-              UriFactory.fileUri(workspaceRoot.resolve(p))
+            jars = workspaceInfo.scalacDeps.map(p =>
+              UriFactory.fileUri(workspaceRoot.resolve("bazel-out").resolve(p))
             ),
             jvmBuildTarget = None
           ).asJson
         )
       )
 
-    def asScalaOptionItem: ScalacOptionsItem =
+    def asScalaOptionItem(workspaceInfo: WorkspaceInfo): ScalacOptionsItem =
       ScalacOptionsItem(
         target = id,
         // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as
         // semanticdb is instead configured in the Bazel rules.
         options = List(
-          s"-Xplugin:${info.semanticdbPluginjar}",
+          s"-Xplugin:${workspaceRoot.resolve("bazel-out").resolve(workspaceInfo.semanticdbDep)}",
           s"-P:semanticdb:sourceroot:${workspaceRoot}"
         ) ::: info.scalacOptions,
         classpath =
@@ -131,14 +146,11 @@ object BspTaskRunner:
       )
 
   case class BspTargetInfo(
-      scalaVersion: String,
       scalacOptions: List[String],
       classpath: List[Path],
-      scalaCompileJars: List[Path],
       srcs: List[Path],
       targetLabel: BazelLabel,
       semanticdbTargetRoot: Path,
-      semanticdbPluginjar: List[Path]
   )
 
   object BspTargetInfo:
@@ -147,15 +159,12 @@ object BspTaskRunner:
     }
 
     given bspTargetInfoDecoder: Decoder[BspTargetInfo] =
-      Decoder.forProduct8(
-        "scala_version",
+      Decoder.forProduct5(
         "scalac_options",
         "classpath",
-        "scala_compiler_jars",
         "srcs",
         "target_label",
         "semanticdb_target_root",
-        "semanticdb_pluginjar"
       )(BspTargetInfo.apply)
 
 case class BspTaskRunner(
@@ -180,6 +189,16 @@ case class BspTaskRunner(
           )
         )
 
+  def workspaceInfo: IO[BspTaskRunner.WorkspaceInfo] =
+    val filePath = workspaceRoot.resolve("bazel-bin").resolve("bsp_workspace_info.json")
+    for
+      result <- runner.build(
+        BazelLabel.fromStringUnsafe("//:bsp_workspace_info")
+      )
+      _ <- raiseIfNotOk(result)
+      deps <- FilesIO.readJson[BspTaskRunner.WorkspaceInfo](filePath)
+    yield deps
+
   private def buildTargets(
       packageRoot: BazelLabel
   ): IO[List[BuildTargetIdentifier]] =
@@ -203,6 +222,7 @@ case class BspTaskRunner(
         BuildTargetIdentifier.bazel(label)
       }
 
+  
   def buildTargets: IO[List[BuildTargetIdentifier]] =
     packageRoots.toList.flatTraverse(buildTargets)
 
@@ -258,12 +278,3 @@ case class BspTaskRunner(
             )
       }
 
-  case class BazelSources(sources: List[String], buildFiles: List[String])
-
-  object BazelSources:
-    given Decoder[BazelSources] = Decoder.instance { c =>
-      for
-        sources <- c.downField("sources").as[List[String]]
-        buildFiles <- c.downField("buildFiles").as[List[String]]
-      yield BazelSources(sources, buildFiles)
-    }
