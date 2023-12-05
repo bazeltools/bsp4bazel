@@ -84,7 +84,7 @@ object BspTaskRunner:
     def majorScalaVersion: String =
       val SemVer = """(\d+)\.(\d+)\.(\d+).*""".r
       scalaVersion match
-        case SemVer("2", minor, patch) =>
+        case SemVer("2", minor, _) =>
           List("2", minor).mkString(".")
         case SemVer("3", _, _) =>
           "3"
