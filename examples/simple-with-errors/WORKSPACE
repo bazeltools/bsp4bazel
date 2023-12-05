@@ -55,6 +55,6 @@ local_repository(
     path = "../../bazel_rules",
 )
 
-load("@bsp4bazel-rules//:bsp4bazel_setup.bzl", "bsp4bazel_setup")
+load("@bsp4bazel-rules//:bsp4bazel.bzl", "bsp4bazel_setup")
 
 bsp4bazel_setup()

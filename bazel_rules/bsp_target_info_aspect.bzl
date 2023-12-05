@@ -62,7 +62,7 @@ def bsp_target_info_aspect_impl(target, ctx):
 
         return [
             OutputGroupInfo(
-                bsp_output = depset([json_output_file] + semanticdb_classpath + compile_classpath),
+                bsp_output = depset([json_output_file]),
             ),
         ]
 
