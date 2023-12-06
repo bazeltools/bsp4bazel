@@ -77,7 +77,7 @@ class Bsp4BazelServer(
       _ <- stateRef.update(s =>
         s.copy(
           targets = Some(targets),
-          targetSourceMap = Bsp4BazelServer.TargetSourceMap(targets),
+          targetSourceMap = Bsp4BazelServer.TargetSourceMap(workspaceRoot, targets),
           workspaceInfo = Some(workspaceInfo)
         )
       )
@@ -89,7 +89,9 @@ class Bsp4BazelServer(
       state <- stateRef.get
       workspaceInfo <- state.workspaceInfo.asIO
       bspTargets <- state.targets.asIO
-    yield WorkspaceBuildTargetsResult(bspTargets.map(_.asBuildTarget(workspaceInfo)))
+    yield WorkspaceBuildTargetsResult(
+      bspTargets.map(_.asBuildTarget(workspaceInfo))
+    )
 
   def buildTargetInverseSources(
       params: InverseSourcesParams
@@ -161,7 +163,7 @@ class Bsp4BazelServer(
         )
       )
       newErrors <- compile(workspaceRoot, runner, target, id, logger)
-      _ <- newErrors.traverse_(client.publishDiagnostics) 
+      _ <- newErrors.traverse_(client.publishDiagnostics)
       clearDiagnostics = mkClearDiagnostics(
         target,
         workspaceRoot,
@@ -307,7 +309,14 @@ object Bsp4BazelServer:
   )
 
   def defaultState: ServerState =
-    ServerState(Bsp4BazelServer.TargetSourceMap.empty, Nil, None, None, None, None)
+    ServerState(
+      Bsp4BazelServer.TargetSourceMap.empty,
+      Nil,
+      None,
+      None,
+      None,
+      None
+    )
 
   def create(
       client: BspClient,
@@ -352,11 +361,20 @@ object Bsp4BazelServer:
       }
 
   object TargetSourceMap:
-    def apply(targets: List[BspTaskRunner.BspTarget]): TargetSourceMap =
+    def apply(
+        workspaceRoot: Path,
+        targets: List[BspTaskRunner.BspTarget]
+    ): TargetSourceMap =
       TargetSourceMap(
         targets
+          .iterator
           .map(t =>
-            (t.id, t.info.srcs.map(path => TextDocumentIdentifier.file(path)))
+            (
+              t.id,
+              t.info.srcs.map(path =>
+                TextDocumentIdentifier.file(workspaceRoot.resolve(path))
+              )
+            )
           )
           .toMap
       )
