@@ -1,5 +1,5 @@
 load("//private:load_tool.bzl", "load_tool")
-load("//private:bsp_workspace_deps.bzl", _bsp_workspace_deps = "bsp_workspace_deps")
+load("//private:bsp_workspace_info.bzl", _bsp_workspace_info = "bsp_workspace_info")
 
 # <--- Updated automatically by release job
 _bsp4bazel_version = "0.0.30"
@@ -26,8 +26,8 @@ def bsp4bazel_setup():
     _bsp4bazel_load("linux-x86")
     _bsp4bazel_load("macos-x86")
 
-def bsp_workspace_deps(name = "bsp_workspace_deps"):
-    if (name != "bsp_workspace_deps"):
-        fail("name must be 'bsp_workspace_deps'")
+def bsp_workspace_info(name = "bsp_workspace_info"):
+    if (name != "bsp_workspace_info"):
+        fail("name must be 'bsp_workspace_info'")
 
-    _bsp_workspace_deps(name = name)
+    _bsp_workspace_info(name = name)

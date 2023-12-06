@@ -45,17 +45,18 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
   def strToTarget(str: String): BuildTargetIdentifier =
     BuildTargetIdentifier.bazel(BazelLabel.fromString(str).toOption.get)
 
-  def bazelEnv(workspaceRoot: Path, packageRoots: NonEmptyList[BazelLabel]) = FunFixture[(Path, BspTaskRunner)](
-    setup = { test =>
-      val bbr = BspTaskRunner.default(
-        workspaceRoot,
-        packageRoots,
-        Logger.noOp
-      )
-      (workspaceRoot, bbr)
-    },
-    teardown = { (_, bbr) => bbr.runner.shutdown }
-  )
+  def bazelEnv(workspaceRoot: Path, packageRoots: NonEmptyList[BazelLabel]) =
+    FunFixture[(Path, BspTaskRunner)](
+      setup = { test =>
+        val bbr = BspTaskRunner.default(
+          workspaceRoot,
+          packageRoots,
+          Logger.noOp
+        )
+        (workspaceRoot, bbr)
+      },
+      teardown = { (_, bbr) => bbr.runner.shutdown }
+    )
 
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
     .test("should list all project tagets") { (root, runner) =>
@@ -68,14 +69,33 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
     }
 
   bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
+    .test("should return the correct metadata for a workspace") {
+      (root, runner) =>
+        val wd = runner.workspaceInfo
+          .unsafeRunSync()
+
+        assertEquals(wd.scalaVersion, "2.12.18")
+
+        val fileNames = wd.scalacDeps.map(_.getFileName.toString)
+        assert(fileNames.exists(_.contains("scala-library-2.12.18")))
+        assert(fileNames.exists(_.contains("scala-reflect-2.12.18")))
+        assert(fileNames.exists(_.contains("scala-compiler-2.12.18")))
+
+        assert(
+          wd.semanticdbDep.getFileName.toString
+            .contains("semanticdb-scalac_2.12.18")
+        )
+    }
+
+  bazelEnv(projectRoot.resolve("examples/simple-no-errors"), packageRoots)
     .test("should return the correct metadata for a given target") {
       (root, runner) =>
         val bt = runner
           .bspTarget(strToTarget("//src/example/foo:foo"))
           .unsafeRunSync()
 
-        assertEquals(bt.info.scalaVersion, "2.12.18")
         assertEquals(bt.info.scalacOptions, Nil)
+
         assertEquals(
           bt.info.classpath.map(_.getFileName.toString).sorted,
           List(
@@ -84,23 +104,17 @@ class BspTaskRunnerTest extends munit.CatsEffectSuite:
             "scala-reflect-2.12.18-stamped.jar"
           )
         )
-        assertEquals(
-          bt.info.scalaCompileJars.map(_.getFileName.toString).sorted,
-          List(
-            "scala-compiler-2.12.18-stamped.jar",
-            "scala-library-2.12.18-stamped.jar",
-            "scala-reflect-2.12.18-stamped.jar"
-          )
-        )
-        assertEquals(
+
+         assertEquals(
           bt.info.srcs.map(_.toString).sorted,
           List(
             "src/example/foo/Bar.scala",
-            "src/example/foo/Foo.scala",
+            "src/example/foo/Foo.scala"
           )
         )
-        assertEquals(bt.info.targetLabel, BazelLabel.fromStringUnsafe("@//src/example/foo:foo"))
+        assertEquals(
+          bt.info.targetLabel,
+          BazelLabel.fromStringUnsafe("@//src/example/foo:foo")
+        )
         assert(bt.info.semanticdbTargetRoot.endsWith("_semanticdb/foo"))
-        assert(bt.info.semanticdbPluginjar.head.endsWith("semanticdb-scalac_2.12.18-4.8.4-stamped.jar"))
     }
-
