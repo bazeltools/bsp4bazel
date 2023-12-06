@@ -4,7 +4,7 @@
 
 class BazelRulesTest extends munit.FunSuite:
 
-  def testBazelAspect[T](dir: os.Path)(implicit loc: munit.Location): Unit = {
+  def testBazelRules[T](dir: os.Path)(implicit loc: munit.Location): Unit = {
     test(s"should output bsp_target_info.json for $dir") {
       os.proc(
         dir / "bazel",
@@ -19,6 +19,22 @@ class BazelRulesTest extends munit.FunSuite:
       assert(os.exists(dir / "bazel-bin" / "src" / "main_run_bsp_target_info.json"))
       assert(os.exists(dir / "bazel-bin" / "src" / "example" / "example_bsp_target_info.json"))
       assert(os.exists(dir / "bazel-bin" / "src" / "example" / "foo" / "foo_bsp_target_info.json"))
+    }
+  
+    test(s"should output bsp_workspace_deps.json for $dir") {
+      os.proc(
+        dir / "bazel",
+        "build",
+        "//:bsp_workspace_deps",
+      ).call(cwd = dir)
+    
+      assert(os.exists(dir / "bazel-bin" / "bsp_workspace_deps.json"))
+    
+      val json = os.read(dir / "bazel-bin" / "bsp_workspace_deps.json")
+      assert(json.contains("semanticdb-scalac"), "No semanticdb dep")
+      assert(json.contains("scala-reflect"), "No scala-reflect dep")
+      assert(json.contains("scala-library"), "No scala-library dep")
+      assert(json.contains("scala-compiler"), "No scala-compiler dep")
     }
   }
 
@@ -39,5 +55,5 @@ class BazelRulesTest extends munit.FunSuite:
     assertEquals(result.exitCode, 1)
   }
 
-  testBazelAspect(os.pwd / "examples" / "simple-no-errors")
-  testBazelAspect(os.pwd / "examples" / "simple-with-errors")
+  testBazelRules(os.pwd / "examples" / "simple-no-errors")
+  testBazelRules(os.pwd / "examples" / "simple-with-errors")
