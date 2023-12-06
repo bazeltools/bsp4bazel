@@ -367,6 +367,7 @@ object Bsp4BazelServer:
     ): TargetSourceMap =
       TargetSourceMap(
         targets
+          .iterator
           .map(t =>
             (
               t.id,
