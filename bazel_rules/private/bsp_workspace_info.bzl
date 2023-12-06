@@ -33,6 +33,8 @@ def _bsp_workspace_info_impl(ctx):
         for deps in find_deps_info_on(ctx, "@io_bazel_rules_scala//scala:toolchain_type", "scala_compile_classpath").deps
         for file in deps[JavaInfo].compile_jars.to_list()
     ]
+    # Dedup classpath
+    compile_classpath = list({item.path: item for item in compile_classpath}.values())
 
     # Why not use the class_jar in SemanticdbInfo? Because it's a string, not a File, so we can't pass
     # pass it to outputs.
