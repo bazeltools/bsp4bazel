@@ -29,6 +29,7 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import cats.data.NonEmptyList
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -234,7 +235,7 @@ case class LspTestProcess(workspaceRoot: Path):
       bspOutQ <- Queue.bounded[IO, String](1_000)
       bspErrQ <- Queue.bounded[IO, String](1_000)
       bspInQ <- Queue.bounded[IO, String](1_000)
-      bspServer = Bsp4BazelApp.server(true)(
+      bspServer = Bsp4BazelApp.server(true, NonEmptyList.one(BazelLabel.fromStringUnsafe("//...")))(
         Stream.fromQueueUnterminated(bspInQ),
         pipeInto(bspOutQ),
         pipeInto(bspErrQ)

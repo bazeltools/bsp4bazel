@@ -1,5 +1,3 @@
-//> using lib "org.scalameta::munit::0.7.29"
-
 import math.Ordering.Implicits.infixOrderingOps
 
 class ProjectTest extends munit.FunSuite {

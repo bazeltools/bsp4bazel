@@ -21,6 +21,7 @@ import io.bazel.rules_scala.diagnostics.diagnostics.TargetDiagnostics
 import io.circe.Decoder
 import io.circe.generic.semiauto.*
 import io.circe.syntax._
+import cats.data.NonEmptyList
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.FileSystems
@@ -45,11 +46,14 @@ object BspTaskRunner:
 
   def default(
       workspaceRoot: Path,
+      packageRoots: NonEmptyList[BazelLabel],
       logger: Logger,
       wrapper: BazelRunner.BazelWrapper
   ): BspTaskRunner =
     BspTaskRunner(
       workspaceRoot,
+      packageRoots,
+      logger,
       BazelRunner.default(
         workspaceRoot,
         logger,
@@ -59,15 +63,42 @@ object BspTaskRunner:
 
   def default(
       workspaceRoot: Path,
+      packageRoots: NonEmptyList[BazelLabel],
       logger: Logger
   ): BspTaskRunner =
     BspTaskRunner(
       workspaceRoot,
+      packageRoots,
+      logger,
       BazelRunner.default(
         workspaceRoot,
         logger
       )
     )
+
+  case class WorkspaceInfo(
+      scalaVersion: String,
+      scalacDeps: List[Path],
+      semanticdbDep: Path
+  ):
+    def majorScalaVersion: String =
+      val SemVer = """(\d+)\.(\d+)\.(\d+).*""".r
+      scalaVersion match
+        case SemVer("2", minor, _) =>
+          List("2", minor).mkString(".")
+        case SemVer("3", _, _) =>
+          "3"
+
+  object WorkspaceInfo:
+
+    import bazeltools.bsp4bazel.protocol.CommonCodecs.pathCodec
+
+    given workspaceInfoDecoder: Decoder[WorkspaceInfo] =
+      Decoder.forProduct3(
+        "scala_version",
+        "scalac_deps",
+        "semanticdb_dep"
+      )(WorkspaceInfo.apply)
 
   case class BspTarget(
       id: BuildTargetIdentifier,
@@ -75,15 +106,7 @@ object BspTaskRunner:
       info: BspTargetInfo
   ):
 
-    private def majorVersion(version: String): String =
-      val SemVer = """(\d+)\.(\d+)\.(\d+).*""".r
-      version match
-        case SemVer("2", minor, patch) =>
-          List("2", minor).mkString(".")
-        case SemVer("3", _, _) =>
-          "3"
-
-    def asBuildTarget: BuildTarget =
+    def asBuildTarget(workspaceInfo: WorkspaceInfo): BuildTarget =
       BuildTarget(
         id = id,
         displayName = Some(id.uri.getPath),
@@ -91,16 +114,15 @@ object BspTaskRunner:
         tags = List("library"),
         capabilities = BuildTargetCapabilities(true, false, false, false),
         languageIds = List("scala"),
-        // TODO
         dependencies = Nil,
         dataKind = Some("scala"),
         Some(
           ScalaBuildTarget(
             scalaOrganization = "org.scala-lang",
-            scalaVersion = info.scalaVersion,
-            scalaBinaryVersion = majorVersion(info.scalaVersion),
+            scalaVersion = workspaceInfo.scalaVersion,
+            scalaBinaryVersion = workspaceInfo.majorScalaVersion,
             platform = ScalaPlatform.JVM,
-            jars = info.scalaCompileJars.map(p =>
+            jars = workspaceInfo.scalacDeps.map(p =>
               UriFactory.fileUri(workspaceRoot.resolve(p))
             ),
             jvmBuildTarget = None
@@ -108,13 +130,13 @@ object BspTaskRunner:
         )
       )
 
-    def asScalaOptionItem: ScalacOptionsItem =
+    def asScalaOptionItem(workspaceInfo: WorkspaceInfo): ScalacOptionsItem =
       ScalacOptionsItem(
         target = id,
-        // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as 
+        // NB: Metals looks for these parameters to be set specifically. They don't really do anything here as
         // semanticdb is instead configured in the Bazel rules.
         options = List(
-          s"-Xplugin:${info.semanticdbPluginjar}",
+          s"-Xplugin:${workspaceRoot.resolve(workspaceInfo.semanticdbDep)}",
           s"-P:semanticdb:sourceroot:${workspaceRoot}"
         ) ::: info.scalacOptions,
         classpath =
@@ -124,14 +146,11 @@ object BspTaskRunner:
       )
 
   case class BspTargetInfo(
-      scalaVersion: String,
       scalacOptions: List[String],
       classpath: List[Path],
-      scalaCompileJars: List[Path],
       srcs: List[Path],
       targetLabel: BazelLabel,
       semanticdbTargetRoot: Path,
-      semanticdbPluginjar: List[Path]
   )
 
   object BspTargetInfo:
@@ -140,18 +159,20 @@ object BspTaskRunner:
     }
 
     given bspTargetInfoDecoder: Decoder[BspTargetInfo] =
-      Decoder.forProduct8(
-        "scala_version",
+      Decoder.forProduct5(
         "scalac_options",
         "classpath",
-        "scala_compiler_jars",
         "srcs",
         "target_label",
         "semanticdb_target_root",
-        "semanticdb_pluginjar"
       )(BspTargetInfo.apply)
 
-case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
+case class BspTaskRunner(
+    workspaceRoot: Path,
+    packageRoots: NonEmptyList[BazelLabel],
+    logger: Logger,
+    runner: BazelRunner
+):
 
   private val SupportedRules = Array(
     "scala_library",
@@ -168,49 +189,59 @@ case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
           )
         )
 
-  def bspTargets: IO[List[BuildTargetIdentifier]] =
-    for
-      result <- runner.query(
-        s"kind(\"${SupportedRules.mkString("|")}\", //...)"
-      )
-      _ <- raiseIfNotOk(result)
-    yield result.stdout
-      .map(BazelLabel.fromString)
-      .collect { case Right(label) =>
-        BuildTargetIdentifier.bazel(label)
-      }
-
-  def bspTarget(
-      target: BuildTargetIdentifier
-  ): IO[BspTaskRunner.BspTargetInfo] =
-    val bazelLabel = BazelLabel.fromBuildTargetIdentifier(target).toOption.get
+  def workspaceInfo: IO[BspTaskRunner.WorkspaceInfo] =
+    val filePath = workspaceRoot.resolve("bazel-bin").resolve("bsp_workspace_info.json")
     for
       result <- runner.build(
-        bazelLabel,
+        BazelLabel.fromStringUnsafe("//:bsp_workspace_info")
+      )
+      _ <- raiseIfNotOk(result)
+      deps <- FilesIO.readJson[BspTaskRunner.WorkspaceInfo](filePath)
+    yield deps
+
+  private def buildTargets(
+      packageRoot: BazelLabel
+  ): IO[List[BuildTargetIdentifier]] =
+    for
+      buildResult <- runner.build(
+        packageRoot,
         (
           "--aspects",
           "@bsp4bazel-rules//:bsp_target_info_aspect.bzl%bsp_target_info_aspect"
         ),
         ("--output_groups", "bsp_output")
       )
-      _ <- raiseIfNotOk(result)
-      filePath = workspaceRoot
-        .resolve("bazel-bin")
-        .resolve(bazelLabel.packagePath.asPath)
-        .resolve(s"${bazelLabel.target.get.asString}_bsp_target_info.json")
-      info <- FilesIO.readJson[BspTaskRunner.BspTargetInfo](filePath)
-    yield info
+      _ <- raiseIfNotOk(buildResult)
+      queryResult <- runner.query(
+        s"kind(\"${SupportedRules.mkString("|")}\", ${packageRoot.asString})"
+      )
+      _ <- raiseIfNotOk(queryResult)
+    yield queryResult.stdout
+      .map(BazelLabel.fromString)
+      .collect { case Right(label) =>
+        BuildTargetIdentifier.bazel(label)
+      }
 
-  // private def readSourceFile(target: BazelLabel): IO[List[String]] =
-  //   val filePath = workspaceRoot
-  //     .resolve("bazel-bin")
-  //     .resolve(target.packagePath.asPath)
-  //     .resolve("sources.json")
-  //   FilesIO.readJson[BazelSources](filePath).map(_.sources)
+  
+  def buildTargets: IO[List[BuildTargetIdentifier]] =
+    packageRoots.toList.flatTraverse(buildTargets)
 
-  // def targetSources(target: BazelLabel): IO[List[String]] =
-  //   runner.build(target) *>
-  //     readSourceFile(target)
+  def bspTargets(
+      targets: List[BuildTargetIdentifier]
+  ): IO[List[BspTaskRunner.BspTarget]] =
+    targets.parTraverse(bspTarget)
+
+  def bspTarget(
+      target: BuildTargetIdentifier
+  ): IO[BspTaskRunner.BspTarget] =
+    val bazelLabel = BazelLabel.fromBuildTargetIdentifier(target).toOption.get
+    val filePath = workspaceRoot
+      .resolve("bazel-bin")
+      .resolve(bazelLabel.packagePath.asPath)
+      .resolve(s"${bazelLabel.target.get.asString}_bsp_target_info.json")
+
+    for info <- FilesIO.readJson[BspTaskRunner.BspTargetInfo](filePath)
+    yield BspTaskRunner.BspTarget(target, workspaceRoot, info)
 
   private def diagnostics: Stream[IO, FileDiagnostics] =
     FilesIO
@@ -247,12 +278,3 @@ case class BspTaskRunner(workspaceRoot: Path, runner: BazelRunner):
             )
       }
 
-  case class BazelSources(sources: List[String], buildFiles: List[String])
-
-  object BazelSources:
-    given Decoder[BazelSources] = Decoder.instance { c =>
-      for
-        sources <- c.downField("sources").as[List[String]]
-        buildFiles <- c.downField("buildFiles").as[List[String]]
-      yield BazelSources(sources, buildFiles)
-    }

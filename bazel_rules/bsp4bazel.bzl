@@ -1,10 +1,11 @@
 load("//private:load_tool.bzl", "load_tool")
+load("//private:bsp_workspace_info.bzl", _bsp_workspace_info = "bsp_workspace_info")
 
 # <--- Updated automatically by release job
-_bsp4bazel_version = "0.0.29"
+_bsp4bazel_version = "0.0.30"
 _build_artifact_shas = {
-    "linux-x86": "8df5d251b327f051984d979030fdce7183fd8c7294ec3f4e3e00645971a42969",
-    "macos-x86": "73ade12570a75ff1373486051c68fa85c296846b8840f64a17abdcfc32655807"
+    "linux-x86": "77c0d32ed13dfa5212b1ad926528b1afff3de2bc6a2d57e78b7075df5341b486",
+    "macos-x86": "79b8a735e6a2b74fe0ce18f4318797728efec5866081cae91512aa605ae8063e"
 }
 # --->
 
@@ -24,3 +25,9 @@ def _bsp4bazel_load(platform):
 def bsp4bazel_setup():
     _bsp4bazel_load("linux-x86")
     _bsp4bazel_load("macos-x86")
+
+def bsp_workspace_info(name = "bsp_workspace_info"):
+    if (name != "bsp_workspace_info"):
+        fail("name must be 'bsp_workspace_info'")
+
+    _bsp_workspace_info(name = name)
