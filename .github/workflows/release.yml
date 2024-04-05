@@ -6,6 +6,11 @@
 name: Perform Release 
 
 on:
+  push:
+    branches:
+      - main
+      - wip/macos
+  pull_request:
   workflow_dispatch:
     inputs:
       version:
@@ -14,24 +19,24 @@ on:
         type: string
 
 jobs:
-  make-binaries:
+  make-linux-binary:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-20.04]
+        os: [ubuntu-20.04]
         include:
-          - os: macos-latest
-            platform: macos-x86
-            artifact: bsp4bazel-macos-x86
           - os: ubuntu-20.04
             platform: linux-ubuntu-20.04
-            artifact: bsp4bazel-linux-x86
+            uploaded_filename: bsp4bazel-x86_64-pc-linux
     name: Make binaries for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Print version
         run: |
-          echo Performing release for ${{ inputs.version }} 
+          echo Performing release for ${{ inputs.version }}
+      - name: Setup Windows C++ toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        if: ${{ matrix.os == 'windows-2019' }}
       - uses: VirtusLab/scala-cli-setup@main
       - uses: graalvm/setup-graalvm@v1
         with:
@@ -40,36 +45,109 @@ jobs:
           components: 'native-image'
           cache: 'sbt'
       # Update version in build.sbt first, as that gets backed into the native-image (via sbt-buildinfo)
-      - name: Update version and build native image
-        run: | 
-          scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bsp4BazelVersion" ${{ inputs.version }}
+      - name: Update version
+        if: github.event_name == 'workflow_dispatch'
+        run: scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bsp4BazelVersion" ${{ inputs.version }}
+      - name: Build native image
+        shell: bash
+        run: |
           sbt clean compile graalvm-native-image:packageBin
-          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bsp4bazel staging ${{ matrix.artifact }} 
+          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bsp4bazel staging ${{ matrix.uploaded_filename }}
       - name: Upload binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
           path: staging
+          name: ${{ matrix.uploaded_filename }}
+
+  native-image-macos:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macOS-12
+            uploaded_filename: bsp4bazel-x86_64-apple-darwin
+          - os: macOS-14
+            uploaded_filename: bsp4bazel-aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print version
+        run: |
+          echo Performing release for ${{ inputs.version }}
+      - uses: VirtusLab/scala-cli-setup@main
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          version: 'latest'
+          java-version: '17'
+          components: 'native-image'
+          cache: 'sbt'
+      # Update version in build.sbt first, as that gets backed into the native-image (via sbt-buildinfo)
+      - name: Update version
+        if: github.event_name == 'workflow_dispatch'
+        run: scala-cli .github/ci_scripts/updateVersion.scala -- build.sbt "^val bsp4BazelVersion" ${{ inputs.version }}
+      # macOS image is missing sbt
+      - name: Build native image
+        shell: bash
+        run: |
+          mkdir -p "$HOME/bin/"
+          curl -sL https://raw.githubusercontent.com/sbt/sbt/v1.9.9/sbt > "$HOME/bin/sbt"
+          export PATH="$PATH:$HOME/bin"
+          chmod +x "$HOME/bin/sbt"
+          sbt clean compile graalvm-native-image:packageBin
+          ./.github/ci_scripts/prepare_output.sh target/graalvm-native-image/bsp4bazel staging ${{ matrix.uploaded_filename }}
+      - uses: actions/upload-artifact@v4
+        with:
+          path: staging
+          name: ${{ matrix.uploaded_filename }}
+
+  native-image-universal-macos:
+    needs: native-image-macos
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macOS-12
+            uploaded_filename: bsp4bazel-universal-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      # Download the aritfacts produced in the preceeding jobs
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: staging
+      - name: Display structure of downloaded files
+        run: ls -R staging
+      - name: Build universal binary
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p target
+          lipo -create -o "target/bsp4bazel" "staging/bsp4bazel-x86_64-apple-darwin/bsp4bazel-x86_64-apple-darwin" "staging/bsp4bazel-aarch64-apple-darwin/bsp4bazel-aarch64-apple-darwin"
+          ./.github/ci_scripts/prepare_output.sh "target/bsp4bazel" staging ${{ matrix.uploaded_filename }}
+      - uses: actions/upload-artifact@v4
+        with:
+          path: staging
+          name: ${{ matrix.uploaded_filename }}
+
   make_release:
+    if: github.event_name == 'workflow_dispatch'
     name: Make release
-    needs: [make-binaries]
+    needs: [make-linux-binary, native-image-universal-macos]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: "repo"
       - uses: VirtusLab/scala-cli-setup@main 
       # Download the aritfacts produced in the preceeding jobs
-      - name: Download linux 20.04
-        uses: actions/download-artifact@v3
+      - name: Download binaries
+        uses: actions/download-artifact@v4
         with:
-          name: bsp4bazel-linux-x86
           path: staging
-      - name: Download macos x86
-        uses: actions/download-artifact@v3
-        with:
-          name: bsp4bazel-macos-x86
-          path: staging
+      - name: Display structure of downloaded files
+        run: ls -R staging
       # Update versions, and shas, in files
       - name: Update versions, and shas
         working-directory: "repo"
@@ -91,9 +169,9 @@ jobs:
           automatic_release_tag: "${{ inputs.version }}"
           prerelease: false
           files: |
-            staging/bsp4bazel-linux-x86
-            staging/bsp4bazel-linux-x86.sha256
-            staging/bsp4bazel-macos-x86
-            staging/bsp4bazel-macos-x86.sha256
+            staging/bsp4bazel-x86_64-pc-linux/bsp4bazel-x86_64-pc-linux
+            staging/bsp4bazel-x86_64-pc-linux/bsp4bazel-x86_64-pc-linux.sha256
+            staging/bsp4bazel-universal-apple-darwin/bsp4bazel-universal-apple-darwin
+            staging/bsp4bazel-universal-apple-darwin/bsp4bazel-universal-apple-darwin.sha256
             staging/bazel_rules.tar.gz
             staging/bazel_rules.tar.gz.sha256
